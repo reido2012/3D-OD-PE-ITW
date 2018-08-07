@@ -1,0 +1,10 @@
+Cython
+fcn
+matplotlib
+numpy
+Pillow
+scipy
+scikit-image
+scikit-learn
+sympy
+tqdm
