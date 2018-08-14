@@ -1,6 +1,7 @@
 # Imports
 import math
 import tensorflow as tf
+import numpy as np
 from nets import nets_factory
 slim = tf.contrib.slim
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -8,18 +9,19 @@ tf.logging.set_verbosity(tf.logging.INFO)
 
 TFRECORDS_DIR = "/notebooks/selerio/pascal3d_tfrecords/"
 TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR + "pascal_train.tfrecords"]
-BATCH_SIZE = 50
+BATCH_SIZE = 32
 NUM_CPU_CORES = 8
 IMAGE_SIZE = 224 # To match ResNet dimensions 
 RESNET_V2_CHECKPOINT_DIR = "/notebooks/selerio/pre_trained_weights/resnet_v2_50.ckpt"
-
+GREYSCALE_SIZE = tf.constant(50176)
+GREYSCALE_CHANNEL = tf.constant(1)
 #META PARAMETERS 
 ALPHA = 1
-BETA = tf.exp(-5)
-GAMMA = tf.exp(-3)
+BETA = math.exp(-5)
+GAMMA = math.exp(-3)
 TRIPLET_LOSS_MARGIN = 1
 HUBER_LOSS_DELTA = 0.01
-STARTING_LR = 0.0001
+STARTING_LR = 0.01
 """
 class RealDomainCNN:
     
@@ -33,16 +35,16 @@ def real_domain_cnn_model_fn(features, labels, mode):
     """
     Real Domain CNN from 3D Object Detection and Pose Estimation paper
     """
-
+    #with tf.device('/gpu:0'):
     # Use Feature Extractor to extract the image descriptors from the images
     network_name = 'resnet_v2_50'
-    
+
     # Retrieve the function that returns logits and endpoints - ResNet was pretrained on ImageNet
     network_fn = nets_factory.get_network_fn(network_name, num_classes=None, is_training=False)
-    
+
     # Retrieve the model scope from network factory
     model_scope = nets_factory.arg_scopes_map[network_name]
-    
+
     # Retrieve the (pre) logits and network endpoints (for extracting activations)
     # Note: endpoints is a dictionary with endpoints[name] = tf.Tensor
     image_descriptors, endpoints = network_fn(features)
@@ -51,7 +53,7 @@ def real_domain_cnn_model_fn(features, labels, mode):
 
     # Find the checkpoint file
     checkpoint_path = RESNET_V2_CHECKPOINT_DIR
-       
+
     if tf.gfile.IsDirectory(checkpoint_path):
         print("Found Directory")
         checkpoint_path = tf.train.latest_checkpoint(checkpoint_path)
@@ -60,55 +62,64 @@ def real_domain_cnn_model_fn(features, labels, mode):
     variables_to_restore = slim.get_variables_to_restore()
     restore_fn = slim.assign_from_checkpoint_fn(checkpoint_path, variables_to_restore)
 
-    # Start the session and load the pre-trained weights
+   # Start the session and load the pre-trained weights
     sess = tf.Session()
     restore_fn(sess)
-    
+
 
     #Add a dense layer to get the 19 neuron linear output layer
     logits = tf.layers.dense(image_descriptors, 19)
     logits = tf.squeeze(logits, name='2d_predictions')
-    
+
     predictions = {
-      # Generate predictions (for PREDICT and EVAL mode)
-      "logits": logits,
+        # Generate predictions (for PREDICT and EVAL mode)
+        "logits": logits,
     }
-        
+
     # create a pose_loss function so that we can ge tthe loss
-    #loss = pose_loss()
-    
+    loss = pose_loss(labels, logits)
+
     #Testing so use huber for now
     loss = tf.losses.huber_loss(labels, logits)
-    
-    # Configure the Training Op (for TRAIN mode)
+
+        # Configure the Training Op (for TRAIN mode)
     if mode == tf.estimator.ModeKeys.TRAIN:
         global_step = tf.train.get_global_step()
-        
+
         learning_rate = tf.train.exponential_decay(
             learning_rate=STARTING_LR, 
             global_step=global_step, 
             decay_steps=100, 
             decay_rate=0.001
         )
-        
+
         optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-        
+
         train_op = optimizer.minimize(
             loss=loss,
             global_step=global_step
         )
-    
-    return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
-    
 
+        return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
+
+
+    # Add evaluation metrics (for EVAL mode)
+
+    eval_metric_ops = {
+        "accuracy": tf.metrics.accuracy(labels=labels, predictions=logits)
+    }
+
+    return tf.estimator.EstimatorSpec(mode=mode, loss=loss, eval_metric_ops=eval_metric_ops)
+
+    
 def pose_loss(labels, logits):
-    return projection_loss(labels[:, :16], logits[:, :16]) + ALPHA * dimension_loss(labels[:, 16:], logits:, [16:]) + BETA * regularization
+    return projection_loss(labels[:, :16], logits[:, :16]) + ALPHA * dimension_loss(labels[:, 16:], logits[:, 16:]) + BETA 
 
-def projection_loss(bbox_labels, logits_bbox)
-    return tf.losses.huber_loss(bbox_labels, logits_bbox, delta=HUBER_LOSS_DELTA)
+def projection_loss(bbox_labels, logits_bbox):
+    return tf.losses.huber_loss(bbox_labels, logits_bbox, delta=HUBER_LOSS_DELTA) / 16
 
 def dimension_loss(dimension_labels, dimension_logits):
-    return tf.losses.huber_loss(dimension_labels, dimension_logits, delta=HUBER_LOSS_DELTA) / 16
+    return tf.losses.huber_loss(dimension_labels, dimension_logits, delta=HUBER_LOSS_DELTA) / 3
 
 def train_input_fn():
     """
@@ -117,6 +128,7 @@ def train_input_fn():
     dataset = tf.data.TFRecordDataset(TRAINING_TFRECORDS).repeat()
     dataset = dataset.shuffle(buffer_size=10000)
     dataset = dataset.map(map_func=tfrecord_parser, num_parallel_calls=NUM_CPU_CORES) #Parallelize data transformation
+    dataset.apply(tf.contrib.data.ignore_errors())
     dataset = dataset.batch(batch_size=BATCH_SIZE)
     dataset = dataset.prefetch(buffer_size=2)
     iterator = dataset.make_one_shot_iterator()
@@ -137,24 +149,28 @@ def tfrecord_parser(serialized_example):
         }
     )
 
-    # Convert Scalar String to Image
+    # Convert Scalar String to uint8
     input_image = tf.decode_raw(features['object_image'], tf.uint8)
-    print(input_image)
-    # Reshape Image
     input_image = tf.to_float(input_image)
-    image_shape = tf.stack([IMAGE_SIZE, IMAGE_SIZE, 3])
+    
+    #Image is not in correct shape so 
+    shape_pred = tf.cast(tf.equal(tf.size(input_image), GREYSCALE_SIZE), tf.bool)
+    image_shape = tf.cond(shape_pred, lambda: tf.stack([IMAGE_SIZE, IMAGE_SIZE, 1]), 
+                          lambda: tf.stack([IMAGE_SIZE, IMAGE_SIZE, 3]))
+    
     input_image = tf.reshape(input_image, image_shape)
-    #turn back into floats
-#    print(features.items())
- #   print(features['output_vector'])
+    
+    channel_pred = tf.cast(tf.equal(tf.shape(input_image)[2], GREYSCALE_CHANNEL), tf.bool)
+    input_image = tf.cond(channel_pred, lambda: tf.image.grayscale_to_rgb(input_image), lambda: input_image)
+    input_image = tf.reshape(input_image, (224, 224, 3))
+    
     output_vector = tf.cast(features['output_vector'], tf.float32)
 
     #Add Blur 
     #blurred_image = utils.blur_image(input_image)
 
     return input_image, output_vector
-
-
+    
 def main(unused_argv):
     #Create your own input function - https://www.tensorflow.org/guide/custom_estimators
     #To handle all of our TF Records
@@ -172,7 +188,7 @@ def main(unused_argv):
     
     real_domain_cnn.train(
       input_fn=train_input_fn,
-      steps=20000,
+      steps=50000,
       hooks=[logging_hook]
     )
     

@@ -38,6 +38,7 @@ DATASET_DIR = osp.expanduser('/notebooks/selerio/datasets/pascal3d/PASCAL3D+_rel
 IMAGENET_IMAGESET_DIR = DATASET_DIR + "/Image_sets/"
 PASCAL_IMAGESET_DIR = DATASET_DIR + "/PASCAL/VOCdevkit/VOC2012/ImageSets/Main/"
 
+
 class Pascal3DAnnotation(object):
 
     def __init__(self, ann_file):
@@ -74,10 +75,18 @@ class Pascal3DAnnotation(object):
                                   viewpoint['py'][0][0][0][0]])
             viewport = viewpoint['viewport'][0][0][0][0]
 
+            truncated = obj['truncated'][0]
+            occluded = obj['occluded'][0]
+            
+            skip = False
+            if truncated or occluded:
+                skip = True
+
             self.objects.append({
                 'cad_index': cad_index,
                 'bbox': bbox,
                 'anchors': anchors,
+                'skip': skip
                 'viewpoint': {
                     'azimuth': azimuth,
                     'elevation': elevation,
@@ -509,11 +518,11 @@ class Pascal3DDataset(object):
         imagenet_train_ids, imagenet_val_ids = self._get_imagenet_ids()
         
         record_map ={
-            #"pascal_train": pascal_train_ids,
+            "pascal_train": pascal_train_ids,
             "pascal_test": pascal_test_ids,
             "pascal_val": pascal_val_ids,
-            #"imagenet_train": imagenet_train_ids,
-            #"imagenet_val": imagenet_val_ids
+            "imagenet_train": imagenet_train_ids,
+            "imagenet_val": imagenet_val_ids
         }
         
         for name, id_list in record_map.items():
@@ -537,24 +546,45 @@ class Pascal3DDataset(object):
             data = self.get_data(0, data_id=data_id)
             
             if data['img'] is None:
-                #print("Annotation Not Found -  Data ID: {}".format(data_id))
+                #Annotation Not Find for Data ID
                 skipped.append(str(data_id) + "\n")
             
             img = data['img']
-
+            
+            if (len(img.shape)) < 3:
+                #Image is greyscale
+                skipped.append(str(data_id) + "\n")
+                continue
+                
+            height, width, _ = img.shape
+            if max(height, width) > 224:
+                apply_blur = 1
+            else:
+                apply_blur = 0
+             
+            
             objects = data['objects']
             class_cads = data['class_cads']
+            
 
             # Create a TF Record for each object in record
             for cls, obj in objects:
+                
+                if obj['skip'] and  record_name in ['pascal_val.tfrecords', 'imagenet_val.tfrecords']:
+                    # We only want to evaluate on non truncated/occluded objects
+                    #Skip object if it is truncated or occluded 
+                    skipped.append(str(data_id) + "\n")
+                    continue
+                
                 output_vector = self._get_real_domain_output_vector(cls, class_cads, obj).astype(np.float)
-                bbox = obj['bbox']
-                cropped_img = self._crop_object_from_img_and_resize(img, bbox)        
-                img_raw = cropped_img.tostring()
+                cropped_img = self._crop_object_from_img(img, bbox)
+                resized_img = scipy.misc.imresize(cropped_img, (224,224))
+                img_raw = resized_img.tostring()
 
                 feature = {
                     'object_image':  self._bytes_feature(img_raw),
                     'output_vector': self._floats_feature(output_vector)
+                    'apply_blur':self._int64_feature(apply_blur)
                 }
 
                 example = tf.train.Example(features=tf.train.Features(feature=feature))
@@ -568,8 +598,8 @@ class Pascal3DDataset(object):
         
         with open(record_name + '_skipped.txt', 'w') as file:
             file.writelines(skipped)
-        
-    def _crop_object_from_img_and_resize(self, img, bbox):
+    
+    def _crop_object_from_img(self, img, bbox):
         """
         Square crops image to the largest dimension of the bbox, then resizes to 224x224
         Args:
@@ -584,8 +614,7 @@ class Pascal3DDataset(object):
         width = x2 - x1
         height = y2 - y1
         max_dim = int(max(width, height))
-        cropped_img = self._crop_to_bounding_box(max_dim, (center_x, center_y), img)
-        return scipy.misc.imresize(cropped_img, (224,224))
+        return self._crop_to_bounding_box(max_dim, (center_x, center_y), img)
     
     def _crop_to_bounding_box(self, max_dim, center, img):
         """
@@ -603,9 +632,9 @@ class Pascal3DDataset(object):
         if max_padding > 0:
             if len(img.shape) == 3:
                 pad_width = ((max_padding, max_padding), (max_padding, max_padding), (0,0))
-            else:
+            #else:
                 #Greyscale
-                pad_width = ((max_padding, max_padding), (max_padding, max_padding))
+                #pad_width = ((max_padding, max_padding), (max_padding, max_padding))
 
             padded_img = np.pad(img, pad_width=pad_width, mode='constant', constant_values=255)
             return padded_img[new_y_min:new_y_max , new_x_min:new_x_max]
@@ -665,12 +694,28 @@ class Pascal3DDataset(object):
         cad_index = obj['cad_index']
         cad = class_cads[cls][cad_index]
         cad_vertices_3d = cad['vertices']
+        bbox = obj['bbox']
         
         dx, dy, dz = self._compute_scalars(cad_vertices_3d)
         virtual_control_points_2d = self._get_bounding_box_corners_in_2d(cad_vertices_3d, obj['viewpoint']) 
-              
-        return  np.append(virtual_control_points_2d.flatten(), np.array([dx, dy, dz]))
         
+        #Normalize 2d Control Points using bbox corners
+        normalized_virtual_control_points = self._normalize_2d_control_points(virtual_control_points_2d.flatten(), bbox)
+        print(normalized_virtual_control_points)
+        return  np.append(normalized_virtual_control_points, np.array([dx, dy, dz]))
+    
+    def _normalize_2d_control_points(control_points, bbox):
+        xmin, ymin, xmax, ymax = bbox
+        
+        new_control_points = []
+        for control_point in control_points:
+            cx, cy = control_point
+            new_x = (cx-xmin)/(xmax-xmin)
+            new_y = (cy-ymin)/(ymax-ymin)
+            new_control_points.append((new_x, new_y))
+            
+        return new_control_points
+    
     def _compute_scalars(self, cad_model_vertices):
         """
         Compute How much we should scale each axis of the unit cube
