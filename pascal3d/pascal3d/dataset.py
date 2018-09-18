@@ -34,7 +34,7 @@ import tqdm
 from pascal3d import utils
 
 
-UNIT_CUBE = np.array(list(product([-1, 1], [-1, 1], [-1, 1])))
+UNIT_CUBE = np.array([[0,1,0],[0,1,1], [0, 0, 0], [0, 0, 1], [1, 1, 0], [1, 1, 1], [1, 0, 0], [1, 0,1]])
 DATASET_DIR = osp.expanduser('/notebooks/selerio/datasets/pascal3d/PASCAL3D+_release1.1')
 IMAGENET_IMAGESET_DIR = DATASET_DIR + "/Image_sets/"
 PASCAL_IMAGESET_DIR = DATASET_DIR + "/PASCAL/VOCdevkit/VOC2012/ImageSets/Main/"
@@ -513,32 +513,32 @@ class Pascal3DDataset(object):
         return [line.rstrip() for line in lines]
     
         
-    def create_tfrecords(self, dataset_type):
+    def create_tfrecords(self, debug=False):
         """
         Create TF.Records file for traning or dataset
-            dataset_type: traning or validation TF.Records
         """
         
         #Get all text files containing ids
         pascal_train_ids, pascal_test_ids, pascal_val_ids = self._get_pascal_data_ids()        
         imagenet_train_ids, imagenet_val_ids = self._get_imagenet_ids()
         
-        record_map ={
+        record_map ={    
             "pascal_train": pascal_train_ids,
-            #"pascal_test": pascal_test_ids,
-            #"pascal_val": pascal_val_ids,
-            #"imagenet_train": imagenet_train_ids,
-            #"imagenet_val": imagenet_val_ids
+            "pascal_test": pascal_test_ids,
+            "pascal_val": pascal_val_ids,
+            "imagenet_train": imagenet_train_ids,
+            "imagenet_val": imagenet_val_ids
         }
         
         for name, id_list in record_map.items():
             tfrecords_filename = '{}.tfrecords'.format(name)
             print("Starting: {}".format(tfrecords_filename))
-            self._create_tfrecords_from_data_ids(tfrecords_filename, id_list)
+            self._create_tfrecords_from_data_ids(tfrecords_filename, id_list, debug)
             print("Finished: {}".format(tfrecords_filename))
             
             
-    def _create_tfrecords_from_data_ids(self, record_name, ids):
+            
+    def _create_tfrecords_from_data_ids(self, record_name, ids, debug):
         """
             Creates TFRecords for a set of ids
             
@@ -548,8 +548,8 @@ class Pascal3DDataset(object):
         
         writer = tf.python_io.TFRecordWriter(record_name)
         skipped = []
-        for data_id in ids:
-            fig = plt.figure()
+        for data_id in tqdm.tqdm(ids):
+            
             data = self.get_data(0, data_id=data_id)
             
             if data['img'] is None:
@@ -565,54 +565,46 @@ class Pascal3DDataset(object):
                 continue
                 
             height, width, _ = img.shape
-            print("Height:")
-            print(height)
-            print("Width:")
-            print(width)
             
             if max(height, width) > 224:
                 apply_blur = 1
             else:
                 apply_blur = 0
              
-            
+
             objects = data['objects']
             class_cads = data['class_cads']
-            
 
-            ax2 = plt.subplot(1,1,1)
-            ax2.imshow(img)
+            if debug: 
+                fig = plt.figure()            
+                ax2 = plt.subplot(1,1,1)
+                ax2.imshow(img)
             
             # Create a TF Record for each object in record
             for counter, (cls, obj) in enumerate(objects):
-                print("****************************")
-                
-                if obj['skip'] or  record_name in ['pascal_val.tfrecords', 'imagenet_val.tfrecords']:
+                if obj['skip'] and  record_name in ['pascal_val.tfrecords', 'imagenet_val.tfrecords', 'eval_check']:
                     # We only want to evaluate on non truncated/occluded objects
                     #Skip object if it is truncated 
                     skipped.append("Object: "+ str(counter) + " In Image: " + str(data_id) + "\n")
                     continue
-                
+               
                 virtual_control_points_2d, bbox_3d_dims = self._get_real_domain_output_vector(
                     cls, class_cads,obj)
-                print("Virtual Control Points")
-                print(virtual_control_points_2d)
                 
                 bbox = obj['bbox'] 
+                
                 # Create a Rectangle patch
-                rect = patches.Rectangle((bbox[0],bbox[1]),bbox[2]-bbox[0],bbox[3]-bbox[1],linewidth=1,edgecolor='r',facecolor='none')
-
-                # Add the patch to the Axes
-                ax2.add_patch(rect)
+                if debug:
+                    rect = patches.Rectangle((bbox[0],bbox[1]),bbox[2]-bbox[0],bbox[3]-bbox[1],linewidth=1,edgecolor='r',facecolor='none')
+                    # Add the patch to the Axes
+                    ax2.add_patch(rect)
+                    
                 cropped_img, square_bbox= self._crop_object_from_img(img, bbox)
-                print("Square BBOX")
-                print("Height:")
-                print(square_bbox[3]-square_bbox[1])
-                print("Width:")
-                print(square_bbox[2]-square_bbox[0])
-                #image_box =  (0, 0, cropped_img.shape[1], cropped_img.shape[0])
-                rect2 = patches.Rectangle((square_bbox[0],square_bbox[1]),square_bbox[2]-square_bbox[0],square_bbox[3]-square_bbox[1],linewidth=1,edgecolor='b',facecolor='none')
-                ax2.add_patch(rect2)
+                
+                if debug:
+                    rect2 = patches.Rectangle((square_bbox[0],square_bbox[1]),square_bbox[2]-square_bbox[0],square_bbox[3]-square_bbox[1],linewidth=1,edgecolor='b',facecolor='none')
+                    ax2.add_patch(rect2)
+                
                 
                 normalized_virtual_control_points = self._normalize_2d_control_points(virtual_control_points_2d, square_bbox)
                 output_vector = np.append(normalized_virtual_control_points, bbox_3d_dims).astype(np.float)
@@ -624,21 +616,26 @@ class Pascal3DDataset(object):
                     'object_image':  self._bytes_feature(img_raw),
                     'output_vector': self._floats_feature(output_vector),
                     'apply_blur':self._int64_feature(apply_blur),
-                    'object_class': self._bytes_feature(cls.encode('utf-8'))
+                    'object_class': self._bytes_feature(cls.encode('utf-8')),
+                    'data_id': self._bytes_feature(data_id.encode('utf-8')),
+                    'object_index': self._int64_feature(counter)
                 }
 
                 example = tf.train.Example(features=tf.train.Features(feature=feature))
                 writer.write(example.SerializeToString())
                     
         writer.close()
+
+        if debug:
+            plt.show()
         
-        plt.show()
-        print("Skipped {} images".format(len(skipped)))
-        print("*********************")
-        print(skipped)
-        
-        with open(record_name + '_skipped.txt', 'w') as file:
-            file.writelines(skipped)
+        if len(skipped) > 0:
+            print("Skipped {} Objects".format(len(skipped)))
+            print("*********************")
+            print(skipped)
+            
+            with open(record_name + '_skipped.txt', 'w') as file:
+                file.writelines(skipped)
     
     def _crop_object_from_img(self, img, bbox):
         """
@@ -648,29 +645,37 @@ class Pascal3DDataset(object):
             bbox: bounding box for the object
         
         Returns:
-            Cropped and padded image
+            Cropped and padded image, and square bounding box
         """
-        print("Original Bounding Box")
-        print(bbox)
-        
+        bbox = np.rint(bbox)
         center = self._get_bbox_center(bbox)
-        print("Center:")
-        print(center)
         max_dim = self._get_bbox_max_dim(bbox)
-        print("Max Dim")
-        print(max_dim)
+
         square_bbox = self._get_square_bounding_box_dimensions(max_dim, center)
-        print("Square Bounding Box")
-        #This box is good as fuck
-        print(square_bbox)
         
         return self._get_square_crop(square_bbox, img)
         
     def _get_bbox_center(self, bbox):
+        """
+        Calculates the center of a bounding box
+        
+        Args:
+            bbox: Bounding box for the object
+        Returns:
+            center coordinates (x,y)
+        """
         x1, y1, x2, y2 = bbox
         return ((x1+x2)/2 , (y1+y2)/2)
     
     def _get_bbox_max_dim(self, bbox):
+        """
+        Calculates the maximum dimension of a bounding box
+        
+        Args:
+            bbox: Bounding box for the object
+        Returns:
+            maximum dimension
+        """
         x1, y1, x2, y2 = bbox
         return max(x2-x1, y2-y1)
     
@@ -702,7 +707,7 @@ class Pascal3DDataset(object):
             center: Center of the bounding box
             img: image that contains the object
         Return: 
-            Padded and square cropped image containing the object
+            Padded and square cropped image containing the object, and updated and bounding box
         """
         img_height, img_width, _ = img.shape
         
@@ -713,31 +718,21 @@ class Pascal3DDataset(object):
         padding_y = 0
         
         if y_max > img_height:
-            print("exceeds image height")
             padding_y += (y_max - img_height)
 
         if y_min < 0:
-            print("below min image height")
             padding_y += (-y_min)
             y_min=0
             
         if x_max > img_width:
-            print("exceeds image width")
             padding_x += (x_max - img_width)
             
         if x_min < 0:
-            print("below min image width")
             padding_x += (-x_min)
             x_min=0
         
         pad_width = ((0, padding_y), (0, padding_x), (0,0))
         padded_img = np.pad(img, pad_width=pad_width, mode='constant', constant_values=255)
-        
-        print("Padding X:")
-        print(padding_x)
-        
-        print("Padding Y:")
-        print(padding_y)
         
         return padded_img[y_min:y_max, x_min:x_max], (x_min, y_min, x_max , y_max )
     
@@ -774,8 +769,7 @@ class Pascal3DDataset(object):
             Normalized control points (16 values)            
         """
         xmin, ymin, xmax, ymax = bbox
-        print("Normalizing:")
-        print(bbox)
+        
         new_control_points = []
         for control_point in control_points:
             cx, cy = control_point
@@ -800,7 +794,7 @@ class Pascal3DDataset(object):
         y_range = max(y) - min(y)
         z_range = max(z) - min(z)
  
-        cube_length = UNIT_CUBE[7,0] - UNIT_CUBE[0,0]
+        cube_length = math.abs(UNIT_CUBE[7,0] - UNIT_CUBE[0,0])
         scalar_x = x_range/cube_length
         scalar_y = y_range/cube_length
         scalar_z = z_range/cube_length
