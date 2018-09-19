@@ -2,7 +2,6 @@
 import math
 import tensorflow as tf
 import numpy as np
-# import model_dataset_utils
 from nets import nets_factory
 slim = tf.contrib.slim
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -199,15 +198,16 @@ def tfrecord_parser(serialized_example):
     output_vector = tf.cast(features['output_vector'], tf.float32)
 
     return input_image, output_vector
-            
-def main(unused_argv):
+@click.command()
+@click.option('--model_dir', default="/notebooks/selerio/pose_estimation_models/the_one_three", help='Path to model to evaluate')       
+def main(model_dir):
     #Create your own input function - https://www.tensorflow.org/guide/custom_estimators
     #To handle all of our TF Records
     
     # Create the Estimator
     real_domain_cnn = tf.estimator.Estimator(
         model_fn=real_domain_cnn_model_fn, 
-        model_dir="/notebooks/selerio/pose_estimation_models/the_one_three" #paper_exact_1
+        model_dir=model_dir
     )
     
     #"""
@@ -233,4 +233,4 @@ def main(unused_argv):
 
 
 if __name__ == "__main__":
-    tf.app.run()
+    tmain()

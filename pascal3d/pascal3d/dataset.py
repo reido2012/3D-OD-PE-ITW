@@ -34,7 +34,9 @@ import tqdm
 from pascal3d import utils
 
 
-UNIT_CUBE = np.array([[0,1,0],[0,1,1], [0, 0, 0], [0, 0, 1], [1, 1, 0], [1, 1, 1], [1, 0, 0], [1, 0,1]])
+# UNIT_CUBE = np.array([[-0.5,0.5,-0.5],[-0.5,0.5,0.5], [-0.5, -0.5, -0.5], [-0.5, -0.5, 0.5], [0.5, 0.5, -0.5], [0.5, 0.5, 0.5], [0.5, -0.5, 0.5], [0.5, -0.5,0.5]])
+# UNIT_CUBE = np.array(list(product([-1, 1], [-1, 1], [-1, 1])))
+UNIT_CUBE = np.array(list(product([-0.5, 0.5], [-0.5, 0.5], [-0.5, 0.5])))
 DATASET_DIR = osp.expanduser('/notebooks/selerio/datasets/pascal3d/PASCAL3D+_release1.1')
 IMAGENET_IMAGESET_DIR = DATASET_DIR + "/Image_sets/"
 PASCAL_IMAGESET_DIR = DATASET_DIR + "/PASCAL/VOCdevkit/VOC2012/ImageSets/Main/"
@@ -582,7 +584,7 @@ class Pascal3DDataset(object):
             
             # Create a TF Record for each object in record
             for counter, (cls, obj) in enumerate(objects):
-                if obj['skip'] and  record_name in ['pascal_val.tfrecords', 'imagenet_val.tfrecords', 'eval_check']:
+                if obj['skip'] and  record_name in ['pascal_val.tfrecords', 'imagenet_val.tfrecords']:
                     # We only want to evaluate on non truncated/occluded objects
                     #Skip object if it is truncated 
                     skipped.append("Object: "+ str(counter) + " In Image: " + str(data_id) + "\n")
@@ -794,7 +796,7 @@ class Pascal3DDataset(object):
         y_range = max(y) - min(y)
         z_range = max(z) - min(z)
  
-        cube_length = math.abs(UNIT_CUBE[7,0] - UNIT_CUBE[0,0])
+        cube_length = abs(UNIT_CUBE[7,0] - UNIT_CUBE[0,0])
         scalar_x = x_range/cube_length
         scalar_y = y_range/cube_length
         scalar_z = z_range/cube_length

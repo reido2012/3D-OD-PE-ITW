@@ -54,5 +54,4 @@ def export_model(input_node_names, output_node_name):
 
             print("graph saved!")
 
-# IN MAIN WITHIN TF SESSION SCOPE
 export_model(["input"], '2d_predictions')

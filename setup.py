@@ -15,6 +15,7 @@ setup(
         "scipy",
         "scikit-learn",
         "opencv-python",
+        "opencv-contrib-python",
         "click"
     ],
 )

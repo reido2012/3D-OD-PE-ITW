@@ -22,8 +22,7 @@ from check_tfrecords import line_boxes
 slim = tf.contrib.slim
 tf.logging.set_verbosity(tf.logging.INFO)
 
-UNIT_CUBE = np.array([[0,1,0],[0,1,1], [0, 0, 0], [0, 0, 1], [1, 1, 0], [1, 1, 1], [1, 0, 0], [1, 0,1]], dtype=np.float32)
-
+UNIT_CUBE = np.array(list(product([-0.5, 0.5], [-0.5, 0.5], [-0.5, 0.5])), dtype=np.float32)
 data_type = 'all'
 DATASET = pascal3d.dataset.Pascal3DDataset(data_type, generate=False)
 TFRECORDS_DIR = "/notebooks/selerio/new_tfrecords/"
@@ -33,9 +32,10 @@ RESNET_V1_CHECKPOINT_DIR = "/notebooks/selerio/pre_trained_weights/resnet_v1_50.
 
 @click.command()
 @click.option('--model_dir', default="/notebooks/selerio/pose_estimation_models/the_one_three", help='Path to model to evaluate')
-@click.option('--tfrecords_file', default=EVAL_TFRECORDS, help='Path to TFRecords file to evaluate model on')
+@click.option('--tfrecords_file', default=EVAL_TFRECORDS, help='Path to TFRecords file to evaluate model on', type=str)
 @click.option('--generate_imgs', default=False, help='If true will plot model results 10 images and save them ')
 def main(model_dir, tfrecords_file, generate_imgs):
+    tfrecords_file=str(tfrecords_file)
     get_viewpoint_errors(model_dir, real_domain_cnn_model_fn_predict, tfrecords_file, generate_imgs)
 
 
@@ -63,17 +63,30 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
         #yield single examples = False useful if model_fn returns some tensors whose first dimension is not equal to the batch size.
         all_model_predictions = real_domain_cnn.predict(input_fn=lambda : predict_input_fn(tfrecords_file), yield_single_examples=True)
 #         all_model_predictions = get_single_examples_from_batch(all_model_predictions)
+        
         for counter, model_prediction in enumerate(all_model_predictions):
+            print(counter)
+            if counter < 2100:
+                continue
+                
             model_output = model_prediction["2d_prediction"]
             image = np.uint8(model_prediction["img"])
-            data_id = model_prediction["data_id"]
+            data_id = model_prediction["data_id"].decode('utf-8')
             object_index = model_prediction["object_index"]
             ground_truth_output = model_prediction["output_vector"]
             print(counter)
-
+            print(data_id)
+            print(object_index)
+            
             ground_truth_rotation_matrix, focal, viewpoint_obj = get_ground_truth_rotation_matrix(data_id, object_index)
             pred_rotation_matrix, reprojected_virtual_control_points = get_predicted_3d_pose(model_output, focal, ground_truth_output)
+            print("Ground Truth Rotation Matrix")
+            print(ground_truth_rotation_matrix)
+            print("Predicted Rotation Matrix")
+            print(pred_rotation_matrix)
+            
             difference = viewpoint_prediction_difference(ground_truth_rotation_matrix, pred_rotation_matrix)
+            inv_difference = viewpoint_prediction_difference(ground_truth_rotation_matrix, LA.inv(pred_rotation_matrix))
             
             if generate_imgs:
                 fig = plt.figure(figsize=(15,15))
@@ -102,6 +115,8 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
             
             print("Difference in Degrees")
             print(math.degrees(difference))
+            print("Difference in Degrees 2")
+            print(math.degrees(inv_difference))
             #If difference is in radians otherwise 30 degrees
             if difference < math.pi/6:
                 print("Within Limit")
@@ -126,10 +141,10 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
             print("************************************************")
             
             if generate_imgs:
-                if counter == 10:
+                if counter == 2105:
                     break
            
-            if counter == 0:
+            if counter == 2105:
                 break
     acc_pi_over_6 = (float(records_within_limit_radians)/len(all_differences)) * 100
     median_error = np.median(np.array(all_differences))
@@ -180,9 +195,18 @@ def get_predicted_3d_pose(output_vector, focal, ground_truth_output):
     """
     predicted_dims = np.array(output_vector[16:])
     virtual_control_points_2d = np.array(output_vector[:16]).reshape(8,2) #These points are normalized
-    
+    print("GT VC")
+    print(ground_truth_output[:16].reshape(8,2)*224)
+    print("PRED VC")
+    print(virtual_control_points_2d*224)
+    print("GT DIMS")
+    print(ground_truth_output[16:])
+    print("PRED DIMS")
+    print(predicted_dims)
+#     print("UNIT CUBE")
+#     print(UNIT_CUBE)
     scaled_unit_cube = compute_scaled_unit_cube(predicted_dims).astype(np.float32)
-
+    
     # Camera internals
     skew = 0
     aspect_ratio = 1
@@ -190,18 +214,17 @@ def get_predicted_3d_pose(output_vector, focal, ground_truth_output):
     image_center = (0.5, 0.5)
     dist_coeffs = np.zeros((4,1)) # Assuming no lens distortion
     camera_matrix = np.array([[ focal_length, 0, image_center[0]], [0, focal_length, image_center[1]], [0, 0, 1]])
-    
-    height, width = virtual_control_points_2d.shape
-    image_points = np.ascontiguousarray(virtual_control_points_2d[:,:2]).reshape((height,1,2))
-    success, rotation_vector, translation_vector = cv2.solvePnP(scaled_unit_cube, image_points, camera_matrix, dist_coeffs, flags=cv2.CV_ITERATIVE)
-#     rotation_vector, translation_vector, _ = cv2.solvePnPRansac(scaled_unit_cube, ground_truth_vc.reshape(8,2), camera_matrix, dist_coeffs, flags=cv2.CV_ITERATIVE)
+
+    success, rotation_vector, translation_vector = cv2.solvePnP(scaled_unit_cube, virtual_control_points_2d, camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE)
+    success, rotation_vector, translation_vector, _= cv2.solvePnPRansac(scaled_unit_cube, virtual_control_points_2d, camera_matrix, distCoeffs=None, reprojectionError=1.5, iterationsCount=100, rvec=rotation_vector, tvec=translation_vector, flags=cv2.SOLVEPNP_ITERATIVE)
 
     #computes projections of 3D points to the image plane 
-    projected_cube = cv2.projectPoints(scaled_unit_cube, rotation_vector, translation_vector, camera_matrix, dist_coeffs)[0]
+    projected_cube = cv2.projectPoints(scaled_unit_cube, rotation_vector, translation_vector,camera_matrix, None)[0]
     reprojected_vc_points = projected_cube.reshape(8,2)
 
+    
     rotation_matrix = cv2.Rodrigues(rotation_vector)[0]
-    rotation_matrix = LA.inv(rotation_matrix)
+#     rotation_matrix = LA.inv(rotation_matrix)
 
     return rotation_matrix, reprojected_vc_points
 
@@ -218,9 +241,12 @@ def get_ground_truth_rotation_matrix(data_id, object_index):
     elevation = obj['viewpoint']['elevation']
     focal  = obj['viewpoint']['focal']
 
-    _, R_rot = utils.get_transformation_matrix(azimuth, elevation, distance)
+    R, R_rot = utils.get_transformation_matrix(azimuth, elevation, distance)
     #Assume Rotation matrrix is for 3d to 2d so we need to inverse
-    R_rot = LA.inv(R_rot)
+#     R_rot = LA.inv(R_rot)
+    print("Inverse Rotation Matrix")
+    print(LA.inv(R_rot))
+
     return R_rot, focal, obj['viewpoint']
 
 def viewpoint_prediction_difference(r_ground_truth, r_predicted):
@@ -228,7 +254,7 @@ def viewpoint_prediction_difference(r_ground_truth, r_predicted):
 
 def compute_scaled_unit_cube(dimensions):
     scalar_x, scalar_y, scalar_z = dimensions
-    scale_matrix = np.array([[scalar_x, 0, 0], [0, scalar_y, 0], [0, 0, scalar_z ]])
+    scale_matrix = np.array([[scalar_x, 0, 0, 0], [0, scalar_y, 0, 0], [0, 0, scalar_z , 0], [0, 0, 0, 1]])
     return apply_transformation(UNIT_CUBE, scale_matrix)
 
 def apply_transformation(cube, transformation_matrix):
@@ -237,8 +263,8 @@ def apply_transformation(cube, transformation_matrix):
     """
     transformed_cube = []
     for vector in cube:
-        new_vector = np.dot(transformation_matrix, vector)
-        transformed_cube.append(new_vector)
+        new_vector = np.dot(transformation_matrix, np.append(vector,[1]))
+        transformed_cube.append(new_vector[:3])
 
     return np.array(transformed_cube)
 
