@@ -2,6 +2,7 @@
 import math
 import tensorflow as tf
 import numpy as np
+import click
 from nets import nets_factory
 slim = tf.contrib.slim
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -67,9 +68,9 @@ def real_domain_cnn_model_fn(features, labels, mode):
     sess = tf.Session()
     restore_fn(sess)
     
-#     image_descriptors = tf.layers.dropout(image_descriptors, rate=0.1, training=is_training)
+    image_descriptors = tf.layers.dropout(image_descriptors, rate=0.1, training=is_training)
     #Add a dense layer to get the 19 neuron linear output layer
-    logits = tf.layers.dense(image_descriptors, 19,  kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=0.0))
+    logits = tf.layers.dense(image_descriptors, 19,  kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=0.0001))
 #     logits = tf.Print(logits, [logits], "Pre Squeeeze Logits")
     logits = tf.squeeze(logits, name='2d_predictions')
     
@@ -199,7 +200,7 @@ def tfrecord_parser(serialized_example):
 
     return input_image, output_vector
 @click.command()
-@click.option('--model_dir', default="/notebooks/selerio/pose_estimation_models/the_one_three", help='Path to model to evaluate')       
+@click.option('--model_dir', default="/notebooks/selerio/pose_estimation_models/the_one_four", help='Path to model to evaluate')       
 def main(model_dir):
     #Create your own input function - https://www.tensorflow.org/guide/custom_estimators
     #To handle all of our TF Records
@@ -233,4 +234,4 @@ def main(model_dir):
 
 
 if __name__ == "__main__":
-    tmain()
+    main()

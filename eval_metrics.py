@@ -61,13 +61,15 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
         all_differences= []
         
         #yield single examples = False useful if model_fn returns some tensors whose first dimension is not equal to the batch size.
-        all_model_predictions = real_domain_cnn.predict(input_fn=lambda : predict_input_fn(tfrecords_file), yield_single_examples=True)
-#         all_model_predictions = get_single_examples_from_batch(all_model_predictions)
+        all_model_predictions = real_domain_cnn.predict(input_fn=lambda : predict_input_fn(tfrecords_file), yield_single_examples=False)
+        
+        #If yielding single examples uncomment the line below - do this if you have a tensor/batch error (slower)
+        all_model_predictions = get_single_examples_from_batch(all_model_predictions)
         
         for counter, model_prediction in enumerate(all_model_predictions):
             print(counter)
-            if counter < 2100:
-                continue
+#             if counter < 0:
+#                 continue
                 
             model_output = model_prediction["2d_prediction"]
             image = np.uint8(model_prediction["img"])
@@ -86,7 +88,6 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
             print(pred_rotation_matrix)
             
             difference = viewpoint_prediction_difference(ground_truth_rotation_matrix, pred_rotation_matrix)
-            inv_difference = viewpoint_prediction_difference(ground_truth_rotation_matrix, LA.inv(pred_rotation_matrix))
             
             if generate_imgs:
                 fig = plt.figure(figsize=(15,15))
@@ -115,8 +116,7 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
             
             print("Difference in Degrees")
             print(math.degrees(difference))
-            print("Difference in Degrees 2")
-            print(math.degrees(inv_difference))
+
             #If difference is in radians otherwise 30 degrees
             if difference < math.pi/6:
                 print("Within Limit")
@@ -141,11 +141,9 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
             print("************************************************")
             
             if generate_imgs:
-                if counter == 2105:
+                if counter == 10:
                     break
            
-            if counter == 2105:
-                break
     acc_pi_over_6 = (float(records_within_limit_radians)/len(all_differences)) * 100
     median_error = np.median(np.array(all_differences))
     print("Final")
@@ -203,28 +201,33 @@ def get_predicted_3d_pose(output_vector, focal, ground_truth_output):
     print(ground_truth_output[16:])
     print("PRED DIMS")
     print(predicted_dims)
-#     print("UNIT CUBE")
-#     print(UNIT_CUBE)
+
     scaled_unit_cube = compute_scaled_unit_cube(predicted_dims).astype(np.float32)
-    
+#         print("UNIT CUBE")
+#     print(UNIT_CUBE)
     # Camera internals
     skew = 0
     aspect_ratio = 1
     focal_length = 1 #Should be 1
     image_center = (0.5, 0.5)
-    dist_coeffs = np.zeros((4,1)) # Assuming no lens distortion
+    dist_coeffs = np.zeros(4) # Assuming no lens distortion
     camera_matrix = np.array([[ focal_length, 0, image_center[0]], [0, focal_length, image_center[1]], [0, 0, 1]])
-
-    success, rotation_vector, translation_vector = cv2.solvePnP(scaled_unit_cube, virtual_control_points_2d, camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE)
-    success, rotation_vector, translation_vector, _= cv2.solvePnPRansac(scaled_unit_cube, virtual_control_points_2d, camera_matrix, distCoeffs=None, reprojectionError=1.5, iterationsCount=100, rvec=rotation_vector, tvec=translation_vector, flags=cv2.SOLVEPNP_ITERATIVE)
+    
+    virtual_control_points_2d[:, 1] = 1 - virtual_control_points_2d[:, 1] 
+    N, M = virtual_control_points_2d.shape
+    imagePoints = np.ascontiguousarray(virtual_control_points_2d[:,:2]).reshape((N,1,2))
+    
+    success, rotation_vector, translation_vector = cv2.solvePnP(scaled_unit_cube, imagePoints, camera_matrix, dist_coeffs, rvec=(1,1,1), tvec=(1,1,1), useExtrinsicGuess=True, flags=cv2.SOLVEPNP_ITERATIVE)
+    success, rotation_vector, translation_vector, _= cv2.solvePnPRansac(scaled_unit_cube, imagePoints, camera_matrix, distCoeffs=dist_coeffs, reprojectionError=0.5, iterationsCount=10000, rvec=rotation_vector, tvec=translation_vector, useExtrinsicGuess=True, flags=cv2.SOLVEPNP_ITERATIVE)
 
     #computes projections of 3D points to the image plane 
-    projected_cube = cv2.projectPoints(scaled_unit_cube, rotation_vector, translation_vector,camera_matrix, None)[0]
+    projected_cube = cv2.projectPoints(scaled_unit_cube, rotation_vector, translation_vector,camera_matrix, None, aspectRatio=aspect_ratio)[0]
     reprojected_vc_points = projected_cube.reshape(8,2)
 
+    print("Reprojected VC Points")
+    print(reprojected_vc_points)
     
     rotation_matrix = cv2.Rodrigues(rotation_vector)[0]
-#     rotation_matrix = LA.inv(rotation_matrix)
 
     return rotation_matrix, reprojected_vc_points
 
@@ -242,15 +245,12 @@ def get_ground_truth_rotation_matrix(data_id, object_index):
     focal  = obj['viewpoint']['focal']
 
     R, R_rot = utils.get_transformation_matrix(azimuth, elevation, distance)
-    #Assume Rotation matrrix is for 3d to 2d so we need to inverse
-#     R_rot = LA.inv(R_rot)
-    print("Inverse Rotation Matrix")
-    print(LA.inv(R_rot))
-
     return R_rot, focal, obj['viewpoint']
 
 def viewpoint_prediction_difference(r_ground_truth, r_predicted):
-    return LA.norm(logm(np.matmul(r_ground_truth.transpose(), r_predicted)), 'fro' )/np.sqrt(2)
+    r_gt_transpose = r_ground_truth.transpose()
+    r_mul = np.matmul(r_gt_transpose, r_predicted)
+    return LA.norm(logm(r_mul), 'fro' )/np.sqrt(2)
 
 def compute_scaled_unit_cube(dimensions):
     scalar_x, scalar_y, scalar_z = dimensions
