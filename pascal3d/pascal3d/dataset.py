@@ -242,7 +242,6 @@ class Pascal3DDataset(object):
                     needle.format(class_name),
                     ann.img_filename)
                 
-                #print("Path To Image: {}".format(img_file))
                 data['img'] = scipy.misc.imread(img_file)
 
             for obj in ann.objects:
@@ -612,19 +611,33 @@ class Pascal3DDataset(object):
                 output_vector = np.append(normalized_virtual_control_points, bbox_3d_dims).astype(np.float)
                 
                 resized_img = scipy.misc.imresize(cropped_img, (224,224))
-                img_raw = resized_img.tostring()
+                
+                for i in range(3):
+                    image = resized_img
+                    blur = True if apply_blur == 1 else False
+                    
+                    if i == 1:
+                        #Augment
+                        image, output_vector = augment_image(image, output_vector, blur=blur, mirror=True, jitter=False)
+                    
+                    if i == 2:
+                        if blur:
+                            image, _ = augment_image(image, output_vector, blur=blur, mirror=False, jitter=False)
+          
+                    img_raw = image.tostring()
 
-                feature = {
-                    'object_image':  self._bytes_feature(img_raw),
-                    'output_vector': self._floats_feature(output_vector),
-                    'apply_blur':self._int64_feature(apply_blur),
-                    'object_class': self._bytes_feature(cls.encode('utf-8')),
-                    'data_id': self._bytes_feature(data_id.encode('utf-8')),
-                    'object_index': self._int64_feature(counter)
-                }
+                    feature = {
+                        'object_image':  self._bytes_feature(img_raw),
+                        'output_vector': self._floats_feature(output_vector),
+                        'blurred':self._int64_feature(apply_blur), 
+                        'jittered': self._bytes_feature("True".encode("utf-8")),
+                        'object_class': self._bytes_feature(cls.encode('utf-8')),
+                        'data_id': self._bytes_feature(data_id.encode('utf-8')),
+                        'object_index': self._int64_feature(counter)
+                    }
 
-                example = tf.train.Example(features=tf.train.Features(feature=feature))
-                writer.write(example.SerializeToString())
+                    example = tf.train.Example(features=tf.train.Features(feature=feature))
+                    writer.write(example.SerializeToString())
                     
         writer.close()
 
@@ -834,7 +847,42 @@ class Pascal3DDataset(object):
     def _floats_feature(self, value):
         return tf.train.Feature(float_list=tf.train.FloatList(value=value))
 
+    def augment_image(self, image, output_vector, blur, mirror, jitter):
+        """
+        Applies specified augmentations to the preprocessed image, and makes the corresponding changes
+        to the output_vector
+        """
+        augmented_output_vector = output_vecor
+        augmented_image = image
+        
+        if mirror:
+            augmented_image, augmented_output_vector = self._mirror_image(augmented_image, augmented_output_vector)
+            
+        if blur:
+            augmented_image = cv2.GaussianBlur(augmented_image, (3, 3), 0)
+        
+        return augmented_image, augmented_output_vector
+        
+        
+    def _mirror_image(self, image, output_vector):
+        """
+        Flips image so that it becomes the mirror of the original image
+        Also flips the virtual control points
+        """
+        vc_points = np.array(output_vector[:16]).reshape(8,2)
+        flipped_image = np.fliplr(image)
+        flipped_vc_points = self._mirror_vc_points_2d(vc_points)
+        return flipped_image, flipped_vc_points
     
+    def mirror_vc_points_2d(self, vc_points):
+        """
+        Flips 2d virtual control points so that they are consistent with the mirror image
+        """
+        flipped_vc_points =[]
+        for x, y  in vc_points:
+            flipped_vc_points.append((224 - x, y))
+        return np.array(flipped_vc_points)
+  
     def show_virtual_control_points(self, i, data_id):
         """
         Transform a 3D unit cube so that it becomes a 3D bounding box for CAD model

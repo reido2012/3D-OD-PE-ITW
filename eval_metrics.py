@@ -31,13 +31,15 @@ OVERFIT_TRAIN = TFRECORDS_DIR + "imagenet_train.tfrecords"
 RESNET_V1_CHECKPOINT_DIR = "/notebooks/selerio/pre_trained_weights/resnet_v1_50.ckpt"
 
 @click.command()
-@click.option('--model_dir', default="/notebooks/selerio/pose_estimation_models/the_one_three", help='Path to model to evaluate')
+@click.option('--model_dir', default="/notebooks/selerio/pose_estimation_models/the_one_five", help='Path to model to evaluate')
 @click.option('--tfrecords_file', default=EVAL_TFRECORDS, help='Path to TFRecords file to evaluate model on', type=str)
 @click.option('--generate_imgs', default=False, help='If true will plot model results 10 images and save them ')
 def main(model_dir, tfrecords_file, generate_imgs):
     tfrecords_file=str(tfrecords_file)
     get_viewpoint_errors(model_dir, real_domain_cnn_model_fn_predict, tfrecords_file, generate_imgs)
 
+def run_eval(model_dir):
+    return get_viewpoint_errors(model_dir, real_domain_cnn_model_fn_predict, EVAL_TFRECORDS, False)
 
 def predict_input_fn( tfrecords_file):
     dataset = tf.data.TFRecordDataset(tfrecords_file).repeat(count=1)
@@ -68,12 +70,11 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
         
         for counter, model_prediction in enumerate(all_model_predictions):
             print(counter)
-#             if counter < 0:
-#                 continue
                 
             model_output = model_prediction["2d_prediction"]
             image = np.uint8(model_prediction["img"])
             data_id = model_prediction["data_id"].decode('utf-8')
+            mirrored = model_prediction["mirrored"]
             object_index = model_prediction["object_index"]
             ground_truth_output = model_prediction["output_vector"]
             print(counter)
@@ -82,6 +83,11 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
             
             ground_truth_rotation_matrix, focal, viewpoint_obj = get_ground_truth_rotation_matrix(data_id, object_index)
             pred_rotation_matrix, reprojected_virtual_control_points = get_predicted_3d_pose(model_output, focal, ground_truth_output)
+            
+            if mirrored:
+                print("Flipped Image: Rotation Matrix Inverted")
+                ground_truth_rotation_matrix = LA.inv(ground_truth_rotation_matrix)
+             
             print("Ground Truth Rotation Matrix")
             print(ground_truth_rotation_matrix)
             print("Predicted Rotation Matrix")
@@ -152,7 +158,7 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
     print("Median Error in Degres ")
     print(str(math.degrees(median_error)))
 
-    return acc_pi_over_6, median_error
+    return str(acc_pi_over_6), math.degrees(median_error)
 
 def get_single_examples_from_batch(all_model_predictions):
     single_examples = []

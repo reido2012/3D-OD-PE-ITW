@@ -1,9 +1,12 @@
 # Imports
+import logging
+logging.basicConfig(format = '%(asctime)s %(message)s', datefmt = '%m/%d/%Y %I:%M:%S %p', filename = '/notebooks/selerio/logs/the_one_seven.log', level=logging.DEBUG)
 import math
 import tensorflow as tf
 import numpy as np
 import click
 from nets import nets_factory
+from eval_metrics import run_eval
 slim = tf.contrib.slim
 tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -32,7 +35,7 @@ def real_domain_cnn_model_fn(features, labels, mode):
     """
     Real Domain CNN from 3D Object Detection and Pose Estimation paper
     """
-    #with tf.device('/gpu:0'):
+#     with tf.device('/gpu:0'):
     # Use Feature Extractor to extract the image descriptors from the images
     #Could use mobilenet for a smaller model
     network_name = 'resnet_v1_50'
@@ -40,7 +43,7 @@ def real_domain_cnn_model_fn(features, labels, mode):
     is_training = (mode == tf.estimator.ModeKeys.TRAIN)
     
     # Retrieve the function that returns logits and endpoints - ResNet was pretrained on ImageNet
-    network_fn = nets_factory.get_network_fn(network_name, num_classes=None, is_training=True)
+    network_fn = nets_factory.get_network_fn(network_name, num_classes=None, is_training=is_training)
 
     # Retrieve the model scope from network factory
     model_scope = nets_factory.arg_scopes_map[network_name]
@@ -68,7 +71,7 @@ def real_domain_cnn_model_fn(features, labels, mode):
     sess = tf.Session()
     restore_fn(sess)
     
-    image_descriptors = tf.layers.dropout(image_descriptors, rate=0.1, training=is_training)
+    image_descriptors = tf.layers.dropout(image_descriptors, rate=0.5, training=is_training)
     #Add a dense layer to get the 19 neuron linear output layer
     logits = tf.layers.dense(image_descriptors, 19,  kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=0.0001))
 #     logits = tf.Print(logits, [logits], "Pre Squeeeze Logits")
@@ -92,7 +95,7 @@ def real_domain_cnn_model_fn(features, labels, mode):
         learning_rate = tf.train.exponential_decay(
             learning_rate=STARTING_LR, 
             global_step=global_step, 
-            decay_steps=26206, #15000
+            decay_steps=23206, #15000
             decay_rate=0.1,
             staircase=True,
             name="learning_rate"
@@ -176,7 +179,7 @@ def tfrecord_parser(serialized_example):
         features={
             'object_image': tf.FixedLenFeature([], tf.string),
             'output_vector': tf.FixedLenFeature([19], tf.float32),
-#             'blur': tf.FixedLenFeature([], tf.int64)
+            'apply_blur': tf.FixedLenFeature([], tf.int64)
             #'data_id': tf.FixedLenFeature([], tf.string),
             #'object_counter': tf.FixedLenFeature([], tf.int64)            
         }
@@ -196,40 +199,43 @@ def tfrecord_parser(serialized_example):
     channel_pred = tf.cast(tf.equal(tf.shape(input_image)[2], GREYSCALE_CHANNEL), tf.bool)
     input_image = tf.cond(channel_pred, lambda: tf.image.grayscale_to_rgb(input_image), lambda: input_image)
     input_image = tf.reshape(input_image, (224, 224, 3))
+    
+    if apply_blur:
+        noise = tf.random_normal(shape=tf.shape(input_image), mean=0.0, stddev=1.0, dtype=tf.float32)
+        output = tf.add(input_image, noise)
+    
     output_vector = tf.cast(features['output_vector'], tf.float32)
 
     return input_image, output_vector
 @click.command()
-@click.option('--model_dir', default="/notebooks/selerio/pose_estimation_models/the_one_four", help='Path to model to evaluate')       
+@click.option('--model_dir', default="/notebooks/selerio/pose_estimation_models/the_one_seven", help='Path to model to evaluate')       
 def main(model_dir):
     #Create your own input function - https://www.tensorflow.org/guide/custom_estimators
     #To handle all of our TF Records
-    
-    # Create the Estimator
-    real_domain_cnn = tf.estimator.Estimator(
-        model_fn=real_domain_cnn_model_fn, 
-        model_dir=model_dir
-    )
-    
-    #"""
-    # Set up logging for predictions
-    # Log the values in the "Softmax" tensor with label "probabilities"
-    tensors_to_log = {"logits": "2d_predictions", "learning_rate": "learning_rate",}
-    logging_hook = tf.train.LoggingTensorHook(tensors=tensors_to_log, every_n_iter=50)
+    with tf.device("/job:localhost/replica:0/task:0/device:GPU:0"):
+        # Create the Estimator
+        real_domain_cnn = tf.estimator.Estimator(
+            model_fn=real_domain_cnn_model_fn, 
+            model_dir=model_dir
+        )
 
-    real_domain_cnn.train(
-      input_fn=train_input_fn,
-      hooks=[logging_hook]
-    )
-   #""" 
-
-#     eval_results = real_domain_cnn.evaluate(input_fn=eval_input_fn)
-#     print(eval_results)
-    
-
-#     predictions = real_domain_cnn.predict(input_fn=predict_input_fn)
-#     print("Predictions")
-#     print(list(predictions))
+        # Set up logging for predictions
+        # Log the values in the "Softmax" tensor with label "probabilities"
+        tensors_to_log = {"logits": "2d_predictions", "learning_rate": "learning_rate",}
+        logging_hook = tf.train.LoggingTensorHook(tensors=tensors_to_log, every_n_iter=100)
+#         counts = [10, 30, 50, 10]
+#         for x, count in enumerate(counts):
+#             if x == 0: 
+#                 continue
+#             print("Current Count:" + str(count))
+        real_domain_cnn.train(
+          input_fn=train_input_fn,
+          hooks=[logging_hook]
+        )
+            
+        acc_pi_6, med_error = run_eval(model_dir)
+#         epochs_elapsed = np.sum(counts[:(x+1)])
+        logging.debug("ACC PI/6: " + acc_pi_6 + " | Med Error: " + str(med_error) + " | Epochs Elapsed: " + str(40))
 
 
 
