@@ -1,10 +1,8 @@
 import tensorflow as tf
 
-TFRECORDS_DIR = "/notebooks/selerio/new_tfrecords/"
+TFRECORDS_DIR = "/notebooks/selerio/"
 TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR + "pascal_train.tfrecords"]
-EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords", TFRECORDS_DIR + "imagenet_val.tfrecords"]
-OVERFIT_TEST_TFRECORDS = "/notebooks/selerio/overfit_check.tfrecords"
-EVAL_TEST_TFRECORDS =  "/notebooks/selerio/eval_check.tfrecords"
+EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
 BATCH_SIZE = 50
 SHUFFLE_BUFFER_SIZE = 18000
 TRAIN_EPOCHS = 100
@@ -36,7 +34,8 @@ def tfrecord_parser(serialized_example):
             'object_image': tf.FixedLenFeature([], tf.string),
             'output_vector': tf.FixedLenFeature([19], tf.float32),
             'data_id': tf.FixedLenFeature([], tf.string),
-            'object_index': tf.FixedLenFeature([], tf.int64)            
+            'object_index': tf.FixedLenFeature([], tf.int64),
+            'mirrored': tf.FixedLenFeature([], tf.int64)
         }
     )
 
@@ -63,7 +62,8 @@ def tfrecord_parser(serialized_example):
         "img": input_image, 
         "object_index": tf.cast(features['object_index'], tf.int32),
         "data_id": data_id,
-        "ground_truth_output": output_vector
+        "ground_truth_output": output_vector,
+        "mirrored": mirrored
     }
     
     return model_input, output_vector

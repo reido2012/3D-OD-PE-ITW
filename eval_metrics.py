@@ -25,9 +25,8 @@ tf.logging.set_verbosity(tf.logging.INFO)
 UNIT_CUBE = np.array(list(product([-0.5, 0.5], [-0.5, 0.5], [-0.5, 0.5])), dtype=np.float32)
 data_type = 'all'
 DATASET = pascal3d.dataset.Pascal3DDataset(data_type, generate=False)
-TFRECORDS_DIR = "/notebooks/selerio/new_tfrecords/"
+TFRECORDS_DIR = "/notebooks/selerio/"
 EVAL_TFRECORDS = TFRECORDS_DIR + "pascal_val.tfrecords"
-OVERFIT_TRAIN = TFRECORDS_DIR + "imagenet_train.tfrecords"
 RESNET_V1_CHECKPOINT_DIR = "/notebooks/selerio/pre_trained_weights/resnet_v1_50.ckpt"
 
 @click.command()
@@ -74,19 +73,15 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
             model_output = model_prediction["2d_prediction"]
             image = np.uint8(model_prediction["img"])
             data_id = model_prediction["data_id"].decode('utf-8')
-            mirrored = model_prediction["mirrored"]
+            mirrored = bool(model_prediction["mirrored"])
             object_index = model_prediction["object_index"]
             ground_truth_output = model_prediction["output_vector"]
             print(counter)
             print(data_id)
             print(object_index)
             
-            ground_truth_rotation_matrix, focal, viewpoint_obj = get_ground_truth_rotation_matrix(data_id, object_index)
+            ground_truth_rotation_matrix, focal, viewpoint_obj = get_ground_truth_rotation_matrix(data_id, object_index, mirrored)
             pred_rotation_matrix, reprojected_virtual_control_points = get_predicted_3d_pose(model_output, focal, ground_truth_output)
-            
-            if mirrored:
-                print("Flipped Image: Rotation Matrix Inverted")
-                ground_truth_rotation_matrix = LA.inv(ground_truth_rotation_matrix)
              
             print("Ground Truth Rotation Matrix")
             print(ground_truth_rotation_matrix)
@@ -249,8 +244,13 @@ def get_ground_truth_rotation_matrix(data_id, object_index):
     azimuth = obj['viewpoint']['azimuth']
     elevation = obj['viewpoint']['elevation']
     focal  = obj['viewpoint']['focal']
-
+    
+    if mirrored:
+        #Flip azimuth angle
+        azimuth = 2*math.pi - azimuth
+        
     R, R_rot = utils.get_transformation_matrix(azimuth, elevation, distance)
+    
     return R_rot, focal, obj['viewpoint']
 
 def viewpoint_prediction_difference(r_ground_truth, r_predicted):

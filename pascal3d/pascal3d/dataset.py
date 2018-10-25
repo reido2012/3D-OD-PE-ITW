@@ -525,7 +525,7 @@ class Pascal3DDataset(object):
         
         record_map ={    
             "pascal_train": pascal_train_ids,
-            "pascal_test": pascal_test_ids,
+#             "pascal_test": pascal_test_ids,
             "pascal_val": pascal_val_ids,
             "imagenet_train": imagenet_train_ids,
             "imagenet_val": imagenet_val_ids
@@ -560,6 +560,7 @@ class Pascal3DDataset(object):
             
             img = data['img']
             
+            
             if (len(img.shape)) < 3:
                 #Image is greyscale
                 skipped.append(str(data_id) + "\n")
@@ -569,10 +570,12 @@ class Pascal3DDataset(object):
             
             if max(height, width) > 224:
                 apply_blur = 1
+                apply_random_crops = True
             else:
                 apply_blur = 0
+                apply_random_crops = False
              
-
+            original_img = img
             objects = data['objects']
             class_cads = data['class_cads']
 
@@ -583,7 +586,7 @@ class Pascal3DDataset(object):
             
             # Create a TF Record for each object in record
             for counter, (cls, obj) in enumerate(objects):
-                if obj['skip'] and  record_name in ['pascal_val.tfrecords', 'imagenet_val.tfrecords']:
+                if obj['skip'] and  record_name == 'pascal_val.tfrecords':
                     # We only want to evaluate on non truncated/occluded objects
                     #Skip object if it is truncated 
                     skipped.append("Object: "+ str(counter) + " In Image: " + str(data_id) + "\n")
@@ -612,32 +615,29 @@ class Pascal3DDataset(object):
                 
                 resized_img = scipy.misc.imresize(cropped_img, (224,224))
                 
-                for i in range(3):
+                #One TF Record with normal image
+                self._write_record(writer, resized_img, output_vector, False, False, False, cls, data_id, counter)
+                
+                # Don't want to augment validation images
+                if record_name != 'pascal_val.tfrecords':
                     image = resized_img
-                    blur = True if apply_blur == 1 else False
-                    
-                    if i == 1:
-                        #Augment
-                        image, output_vector = augment_image(image, output_vector, blur=blur, mirror=True, jitter=False)
-                    
-                    if i == 2:
-                        if blur:
-                            image, _ = augment_image(image, output_vector, blur=blur, mirror=False, jitter=False)
-          
-                    img_raw = image.tostring()
+                    blur = True if (apply_blur == 1) else False
 
-                    feature = {
-                        'object_image':  self._bytes_feature(img_raw),
-                        'output_vector': self._floats_feature(output_vector),
-                        'blurred':self._int64_feature(apply_blur), 
-                        'jittered': self._bytes_feature("True".encode("utf-8")),
-                        'object_class': self._bytes_feature(cls.encode('utf-8')),
-                        'data_id': self._bytes_feature(data_id.encode('utf-8')),
-                        'object_index': self._int64_feature(counter)
-                    }
 
-                    example = tf.train.Example(features=tf.train.Features(feature=feature))
-                    writer.write(example.SerializeToString())
+                    mirror = True
+                    image, output_vector = self._augment_image(image, output_vector, blur=blur, mirror=mirror)
+                    self._write_record(writer, image, output_vector, blur, False, False, cls, data_id, counter)
+
+                    mirror = False
+                    if blur:
+                        image, output_vector = self._augment_image(image, output_vector, blur=blur, mirror=mirror)
+                        self._write_record(writer, image, output_vector, blur, False, mirror, cls, data_id, counter)
+
+                    if apply_random_crops:
+                        all_random_crops, output_vector = self._create_random_crops(original_img, bbox, virtual_control_points_2d, bbox_3d_dims)
+
+                        for random_crop in all_random_crops:
+                            self._write_record(writer, random_crop, output_vector, False, True, False, cls, data_id, counter)
                     
         writer.close()
 
@@ -651,6 +651,58 @@ class Pascal3DDataset(object):
             
             with open(record_name + '_skipped.txt', 'w') as file:
                 file.writelines(skipped)
+    
+    def _write_record(self, record_writer, image, output_vector, apply_blur, jittered, mirrored, object_cls, data_id, object_index):
+        img_raw = image.tostring()
+           
+        feature = {
+            'object_image':  self._bytes_feature(img_raw),
+            'output_vector': self._floats_feature(output_vector),
+            'blurred':self._int64_feature(apply_blur), 
+            'mirrored': self._int64_feature(int(mirrored)),
+            'jittered': self._int64_feature(int(jittered)),
+            'object_class': self._bytes_feature(object_cls.encode('utf-8')),
+            'data_id': self._bytes_feature(data_id.encode('utf-8')),
+            'object_index': self._int64_feature(object_index)
+        }
+
+        example = tf.train.Example(features=tf.train.Features(feature=feature))
+        record_writer.write(example.SerializeToString())
+    
+    def _create_random_crops(self, img, bbox, virtual_control_points_2d, bbox_3d_dims, number_of_crops=16):
+        x_offset = y_offset = 16
+        bbox_x1, bbox_y1, bbox_x2, bbox_y2 = bbox
+        jittered_bbox = (bbox_x1-x_offset, bbox_y1-y_offset, bbox_x2 + x_offset, bbox_y2 + y_offset)
+        jittered_img, jittered_square_bbox= self._crop_object_from_img(img, jittered_bbox)
+        j_h, j_w, _ = jittered_img.shape
+        crop_dims = 5*(224 //8)
+        
+        jittered_img = scipy.misc.imresize(jittered_img, (224,224))
+        j_nvcp = self._normalize_2d_control_points(virtual_control_points_2d, jittered_square_bbox)
+        jittered_ov = np.append(j_nvcp, bbox_3d_dims).astype(np.float)
+        
+        r_crops = []
+        
+        for i in range(number_of_crops):
+            r_crop, _ = self._random_crop(jittered_img, crop_size=(crop_dims, crop_dims))
+            r_crops.append(r_crop)
+        
+        return r_crops, jittered_ov
+        
+    def _random_crop(self, image, crop_size=(140, 140)):
+        h, w, _ = image.shape
+        top = np.random.randint(0, h - crop_size[0])
+        left = np.random.randint(0, w - crop_size[1])
+
+        bottom = top + crop_size[0]
+        right = left + crop_size[1]
+
+        new_image = np.zeros((224,224,3), dtype=np.uint8)
+        new_image.fill(255)
+        image_section = image[top:bottom, left:right, :]
+
+        new_image[top:bottom, left:right, :] = image_section
+        return new_image, image_section
     
     def _crop_object_from_img(self, img, bbox):
         """
@@ -847,12 +899,13 @@ class Pascal3DDataset(object):
     def _floats_feature(self, value):
         return tf.train.Feature(float_list=tf.train.FloatList(value=value))
 
-    def augment_image(self, image, output_vector, blur, mirror, jitter):
+    def _augment_image(self, image, original_output_vector, blur, mirror):
         """
         Applies specified augmentations to the preprocessed image, and makes the corresponding changes
         to the output_vector
         """
-        augmented_output_vector = output_vecor
+        #Output Vector is Normalized!
+        augmented_output_vector = original_output_vector
         augmented_image = image
         
         if mirror:
@@ -861,7 +914,7 @@ class Pascal3DDataset(object):
         if blur:
             augmented_image = cv2.GaussianBlur(augmented_image, (3, 3), 0)
         
-        return augmented_image, augmented_output_vector
+        return augmented_image, augmented_output_vector.astype(np.float)
         
         
     def _mirror_image(self, image, output_vector):
@@ -872,16 +925,16 @@ class Pascal3DDataset(object):
         vc_points = np.array(output_vector[:16]).reshape(8,2)
         flipped_image = np.fliplr(image)
         flipped_vc_points = self._mirror_vc_points_2d(vc_points)
-        return flipped_image, flipped_vc_points
+        output_vector[:16] = flipped_vc_points.flatten()
+        return flipped_image, output_vector
     
-    def mirror_vc_points_2d(self, vc_points):
+    def _mirror_vc_points_2d(self, vc_points, image_width=1):
         """
         Flips 2d virtual control points so that they are consistent with the mirror image
         """
-        flipped_vc_points =[]
-        for x, y  in vc_points:
-            flipped_vc_points.append((224 - x, y))
-        return np.array(flipped_vc_points)
+        vc_points[:, 0] = image_width - vc_points[:, 0] 
+
+        return vc_points
   
     def show_virtual_control_points(self, i, data_id):
         """

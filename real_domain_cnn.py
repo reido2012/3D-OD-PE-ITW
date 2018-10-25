@@ -11,11 +11,9 @@ slim = tf.contrib.slim
 tf.logging.set_verbosity(tf.logging.INFO)
 
 
-TFRECORDS_DIR = "/notebooks/selerio/new_tfrecords/"
+TFRECORDS_DIR = "/notebooks/selerio/"
 TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR + "pascal_train.tfrecords",  TFRECORDS_DIR + "imagenet_val.tfrecords"]
 EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
-OVERFIT_TEST_TFRECORDS = "/notebooks/selerio/overfit_check.tfrecords"
-EVAL_TEST_TFRECORDS =  "/notebooks/selerio/eval_check.tfrecords"
 BATCH_SIZE = 50
 NUM_CPU_CORES = 8
 IMAGE_SIZE = 224 # To match ResNet dimensions 
@@ -95,7 +93,7 @@ def real_domain_cnn_model_fn(features, labels, mode):
         learning_rate = tf.train.exponential_decay(
             learning_rate=STARTING_LR, 
             global_step=global_step, 
-            decay_steps=23206, #15000
+            decay_steps=23206,
             decay_rate=0.1,
             staircase=True,
             name="learning_rate"
@@ -107,7 +105,10 @@ def real_domain_cnn_model_fn(features, labels, mode):
             loss=loss,
             global_step=global_step
         )
-
+        
+        tf.summary.image('input_images', features)
+        tf.summary.histogram('vc_points_predictions', logits)
+        
         return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
 
 
@@ -178,10 +179,7 @@ def tfrecord_parser(serialized_example):
         # Defaults are not specified since both keys are required.
         features={
             'object_image': tf.FixedLenFeature([], tf.string),
-            'output_vector': tf.FixedLenFeature([19], tf.float32),
-            'apply_blur': tf.FixedLenFeature([], tf.int64)
-            #'data_id': tf.FixedLenFeature([], tf.string),
-            #'object_counter': tf.FixedLenFeature([], tf.int64)            
+            'output_vector': tf.FixedLenFeature([19], tf.float32)
         }
     )
 
@@ -200,15 +198,12 @@ def tfrecord_parser(serialized_example):
     input_image = tf.cond(channel_pred, lambda: tf.image.grayscale_to_rgb(input_image), lambda: input_image)
     input_image = tf.reshape(input_image, (224, 224, 3))
     
-    if apply_blur:
-        noise = tf.random_normal(shape=tf.shape(input_image), mean=0.0, stddev=1.0, dtype=tf.float32)
-        output = tf.add(input_image, noise)
-    
     output_vector = tf.cast(features['output_vector'], tf.float32)
+
 
     return input_image, output_vector
 @click.command()
-@click.option('--model_dir', default="/notebooks/selerio/pose_estimation_models/the_one_seven", help='Path to model to evaluate')       
+@click.option('--model_dir', default="/notebooks/selerio/pose_estimation_models/the_one_eight", help='Path to model to evaluate')       
 def main(model_dir):
     #Create your own input function - https://www.tensorflow.org/guide/custom_estimators
     #To handle all of our TF Records
@@ -223,11 +218,7 @@ def main(model_dir):
         # Log the values in the "Softmax" tensor with label "probabilities"
         tensors_to_log = {"logits": "2d_predictions", "learning_rate": "learning_rate",}
         logging_hook = tf.train.LoggingTensorHook(tensors=tensors_to_log, every_n_iter=100)
-#         counts = [10, 30, 50, 10]
-#         for x, count in enumerate(counts):
-#             if x == 0: 
-#                 continue
-#             print("Current Count:" + str(count))
+
         real_domain_cnn.train(
           input_fn=train_input_fn,
           hooks=[logging_hook]
