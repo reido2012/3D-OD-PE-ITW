@@ -37,7 +37,7 @@ from pascal3d import utils
 # UNIT_CUBE = np.array([[-0.5,0.5,-0.5],[-0.5,0.5,0.5], [-0.5, -0.5, -0.5], [-0.5, -0.5, 0.5], [0.5, 0.5, -0.5], [0.5, 0.5, 0.5], [0.5, -0.5, 0.5], [0.5, -0.5,0.5]])
 # UNIT_CUBE = np.array(list(product([-1, 1], [-1, 1], [-1, 1])))
 UNIT_CUBE = np.array(list(product([-0.5, 0.5], [-0.5, 0.5], [-0.5, 0.5])))
-DATASET_DIR = osp.expanduser('/notebooks/selerio/datasets/pascal3d/PASCAL3D+_release1.1')
+DATASET_DIR = osp.expanduser('/home/omarreid/selerio/datasets/pascal3d/PASCAL3D+_release1.1')
 IMAGENET_IMAGESET_DIR = DATASET_DIR + "/Image_sets/"
 PASCAL_IMAGESET_DIR = DATASET_DIR + "/PASCAL/VOCdevkit/VOC2012/ImageSets/Main/"
 
@@ -144,14 +144,14 @@ class Pascal3DDataset(object):
         'tvmonitor',
     ]
 
-    def __init__(self, data_type, generate=True):
+    def __init__(self, data_type, generate=True, dataset_path="/home/omarreid/selerio/datasets/pascal3d/PASCAL3D+_release1.1"):
         assert data_type in ('train', 'val', 'all')
-        self.dataset_dir = osp.expanduser(
-            '/notebooks/selerio/datasets/pascal3d/PASCAL3D+_release1.1')
+        self.dataset_dir = osp.expanduser(dataset_path)
         # get all data ids
         if generate:
             print('Generating index for annotations...')
             data_ids = []
+            print(self.class_names[1:])
             for counter, cls in enumerate(self.class_names[1:]):
                 pascal_cls_ann_dir = osp.join(self.dataset_dir, 'Annotations/{}_pascal'.format(cls))
                 imagenet_class_ann_dir = osp.join(self.dataset_dir,'Annotations/{}_imagenet'.format(cls))
@@ -165,10 +165,7 @@ class Pascal3DDataset(object):
                         data_id = ann_file.split("/")[-1][:-4]
                         #print("Data Id: {}".format(data_id))
                         data_ids.append(data_id)
-                    break
-                break
-                    
-
+                   
             print(len(set(data_ids)))
             print('Done.')
             data_ids = list(set(data_ids))
@@ -207,7 +204,8 @@ class Pascal3DDataset(object):
             
             ann = Pascal3DAnnotation(ann_file)
             #When creating the TF.Records we don't care about label cls
-            if data['label_cls'] is None and ann.database != "ImageNet" and data_id is None:
+            #and ann.database != "ImageNet" and data_id is None
+            if data['label_cls'] is None :
                 label_cls_file = osp.join(
                     self.dataset_dir,
                     'PASCAL/VOCdevkit/VOC2012/SegmentationClass/{}.png'.format(data_id))
@@ -526,7 +524,7 @@ class Pascal3DDataset(object):
         record_map ={    
             "pascal_train": pascal_train_ids,
 #             "pascal_test": pascal_test_ids,
-            "pascal_val": pascal_val_ids,
+#             "pascal_val": pascal_val_ids,
             "imagenet_train": imagenet_train_ids,
             "imagenet_val": imagenet_val_ids
         }
@@ -536,8 +534,157 @@ class Pascal3DDataset(object):
             print("Starting: {}".format(tfrecords_filename))
             self._create_tfrecords_from_data_ids(tfrecords_filename, id_list, debug)
             print("Finished: {}".format(tfrecords_filename))
+    
+    
+    def create_tfrecords_synth_domain(self):
+        pascal_train_ids, pascal_test_ids, pascal_val_ids = self._get_pascal_data_ids()        
+        imagenet_train_ids, imagenet_val_ids = self._get_imagenet_ids()
+        
+        record_map ={    
+            "pascal_train": pascal_train_ids,
+#             "pascal_test": pascal_test_ids,
+            "pascal_val": pascal_val_ids,
+            "imagenet_train": imagenet_train_ids,
+            "imagenet_val": imagenet_val_ids
+        }
+        
+        for name, id_list in record_map.items():
+            tfrecords_filename = '{}.tfrecords'.format(name)
+            print("Starting: {}".format(tfrecords_filename))
+            self._create_synth_tfrecords_from_data_ids(tfrecords_filename, id_list, False)
+            print("Finished: {}".format(tfrecords_filename))
+    
+    def _set_image_operations(self, img):
+        height, width, _ = img.shape
             
+        if max(height, width) > 224:
+            apply_blur = 1
+            apply_random_crops = True
+        else:
+            apply_blur = 0
+            apply_random_crops = False
+
+        return apply_blur, apply_random_crops
+    
+    def _create_synth_tfrecords_from_data_ids(self, record_name, ids, debug):
+        writer = tf.python_io.TFRecordWriter("/home/omarreid/selerio/synth_domain_records/"+record_name)
+        skipped = []
+        
+        for data_id in ids:
+           
+            data = self.get_data(0, data_id=data_id)
+            if data['img'] is None:
+                print("No Image")
+                #Annotation Not Find for Data ID
+                skipped.append(str(data_id) + "\n")
+                continue
+            img = data['img']
             
+            if (len(img.shape)) < 3:
+                print("Greyscale")
+                #Image is greyscale
+                skipped.append(str(data_id) + "\n")
+                continue
+             
+            original_img = img
+            objects = data['objects']
+            class_cads = data['class_cads']
+#             print(f"Data ID: {data_id}")
+                
+            for counter, (cls, obj) in enumerate(objects):
+                if obj['skip'] and  record_name == 'pascal_val.tfrecords':
+                    # We only want to evaluate on non truncated/occluded objects
+                    #Skip object if it is truncated 
+                    skipped.append("Object: "+ str(counter) + " In Image: " + str(data_id) + "\n")
+                    continue
+                
+                print("Getting Information:")
+                virtual_control_points_2d, bbox_3d_dims = self._get_real_domain_output_vector(cls, class_cads,obj)
+                bbox = obj['bbox'] 
+                cropped_img, square_bbox= self._crop_object_from_img(img, bbox)
+                resized_img = scipy.misc.imresize(cropped_img, (224,224))
+                cad_index = obj['cad_index']
+                
+                
+                R, R_rot = utils.get_transformation_matrix(
+                obj['viewpoint']['azimuth'],
+                obj['viewpoint']['elevation'],
+                obj['viewpoint']['distance'],
+                )
+#                 print(f"Rotation Matrix: {R_rot}")
+                rotation_tuple = self._rotation_matrix_to_euler_angles(R_rot)   
+#                 print(f"Rotation Tuple: {rotation_tuple}")
+                cad_index = self.get_cad_number(cad_index)
+#                 print(f"Cad Index: {cad_index}")
+
+                positive_depth_map_image_path = self.render_for_dataset(cls, cad_index, rotation_tuple, data_id)
+                print("PD Image Path: " + positive_depth_map_image_path)
+                return
+                positive_depth_image = scipy.misc.imread(positive_depth_map_image_path)
+                
+                self._write_synth_record(writer, resized_img, positive_depth_image, rotation_tuple, cad_index, cls, data_id)
+                
+                return
+            return
+    
+    def get_cad_number(self, cad_index):
+        index = int(cad_index) + 1
+        return '0' + str(index)
+    def render_for_dataset(self, image_class, cad_index, rotation_xyz, record_id):
+        x_rotation, y_rotation, z_rotation = rotation_xyz
+        
+        x_rotation = int(round(x_rotation))
+        y_rotation = int(round(y_rotation))
+        z_rotation = int(round(z_rotation))
+        
+        #render for each object in CAD_OBJ in image_class
+        # return path to depth image and we want - gt_index
+        for object_path in glob.glob("/home/omarreid/selerio/datasets/pascal3d/PASCAL3D+_release1.1/CAD_OBJ/" + image_class + "/*.obj"):
+
+            curr_obj_cad_index = object_path.split("/")[-1].split(".")[0]
+
+            command = "nvidia-docker run -v /home/omarreid/selerio/:/workdir peterlauri/blender-python:latest blender -noaudio --background --python /workdir/pix3d/blender_render.py --  --specific_viewpoint True --cad_index " +  curr_obj_cad_index + " --viewpoint=" + str(x_rotation) + "," + str(y_rotation) + "," + str(z_rotation) + " --output_folder /workdir/pix3d/synth_renderings/" + str(record_id) + " "
+        
+            print("Object Path: " + object_path)
+            print("Curr CAD INDEX: " + str(curr_obj_cad_index) )
+            print("Class: " + str(image_class) )
+            print("Command: " + command)
+
+            docker_object_path = "/workdir/" + "/".join(object_path.split("/")[4:])
+            full_command = command + docker_object_path
+            try:
+                process = subprocess.run(full_command.split(), check=True)
+            except subprocess.CalledProcessError as e:
+                print(e)
+                raise e
+    
+        return "/home/omarreid/selerio/pix3d/synth_renderings/" + str(record_id) + "/" + str(cad_index) + "_0001.png"
+        
+    def _is_rotation_matrix(self, R) :
+        Rt = np.transpose(R)
+        shouldBeIdentity = np.dot(Rt, R)
+        I = np.identity(3, dtype = R.dtype)
+        n = np.linalg.norm(I - shouldBeIdentity)
+        return n < 1e-6
+ 
+    def _rotation_matrix_to_euler_angles(self, R) :
+
+        assert(self._is_rotation_matrix(R))
+
+        sy = math.sqrt(R[0,0] * R[0,0] +  R[1,0] * R[1,0])
+
+        singular = sy < 1e-6
+
+        if  not singular :
+            x = math.atan2(R[2,1] , R[2,2])
+            y = math.atan2(-R[2,0], sy)
+            z = math.atan2(R[1,0], R[0,0])
+        else :
+            x = math.atan2(-R[1,2], R[1,1])
+            y = math.atan2(-R[2,0], sy)
+            z = 0
+
+        return np.array([math.degrees(x), math.degrees(y), math.degrees(z)])
             
     def _create_tfrecords_from_data_ids(self, record_name, ids, debug):
         """
@@ -547,7 +694,7 @@ class Pascal3DDataset(object):
                 ids: list of data ids        
         """
         
-        writer = tf.python_io.TFRecordWriter(record_name)
+        writer = tf.python_io.TFRecordWriter("/notebooks/selerio/tf_records_blur_only/"+record_name)
         skipped = []
         for data_id in tqdm.tqdm(ids):
             
@@ -560,20 +707,12 @@ class Pascal3DDataset(object):
             
             img = data['img']
             
-            
             if (len(img.shape)) < 3:
                 #Image is greyscale
                 skipped.append(str(data_id) + "\n")
                 continue
                 
-            height, width, _ = img.shape
-            
-            if max(height, width) > 224:
-                apply_blur = 1
-                apply_random_crops = True
-            else:
-                apply_blur = 0
-                apply_random_crops = False
+            apply_blur, apply_random_crops = self._set_image_operations
              
             original_img = img
             objects = data['objects']
@@ -624,20 +763,20 @@ class Pascal3DDataset(object):
                     blur = True if (apply_blur == 1) else False
 
 
-                    mirror = True
-                    image, output_vector = self._augment_image(image, output_vector, blur=blur, mirror=mirror)
-                    self._write_record(writer, image, output_vector, blur, False, False, cls, data_id, counter)
+#                     mirror = True
+#                     image, output_vector = self._augment_image(image, output_vector, blur=blur, mirror=mirror)
+#                     self._write_record(writer, image, output_vector, blur, False, False, cls, data_id, counter)
 
                     mirror = False
                     if blur:
                         image, output_vector = self._augment_image(image, output_vector, blur=blur, mirror=mirror)
                         self._write_record(writer, image, output_vector, blur, False, mirror, cls, data_id, counter)
 
-                    if apply_random_crops:
-                        all_random_crops, output_vector = self._create_random_crops(original_img, bbox, virtual_control_points_2d, bbox_3d_dims)
+#                     if apply_random_crops:
+#                         all_random_crops, output_vector = self._create_random_crops(original_img, bbox, virtual_control_points_2d, bbox_3d_dims)
 
-                        for random_crop in all_random_crops:
-                            self._write_record(writer, random_crop, output_vector, False, True, False, cls, data_id, counter)
+#                         for random_crop in all_random_crops:
+#                             self._write_record(writer, random_crop, output_vector, False, True, False, cls, data_id, counter)
                     
         writer.close()
 
@@ -668,8 +807,25 @@ class Pascal3DDataset(object):
 
         example = tf.train.Example(features=tf.train.Features(feature=feature))
         record_writer.write(example.SerializeToString())
+        
+    def _write_synth_record(self, record_writer, image, positive_depth_map_image, rotation_tuple, cad_index, object_class, uid):
+        img_raw = image.tostring()
+        depth_img_raw = positive_depth_map_image.tostring()
+        
+        feature = {
+            'object_image': self._bytes_feature(img_raw),
+            'positive_depth_image': self._bytes_feature(depth_img_raw),
+            'object_class': self._bytes_feature(object_class.encode('utf-8')),
+            'unique_id': self._bytes_feature(uid.encode('utf-8')),
+            'cad_index': self._int64_feature(cad_index)
+        }
+        
+        example = tf.train.Example(features=tf.train.Features(feature=feature))
+        record_writer.write(example.SerializeToString())
     
-    def _create_random_crops(self, img, bbox, virtual_control_points_2d, bbox_3d_dims, number_of_crops=16):
+    
+    
+    def _create_random_crops(self, img, bbox, virtual_control_points_2d, bbox_3d_dims, number_of_crops=4):
         x_offset = y_offset = 16
         bbox_x1, bbox_y1, bbox_x2, bbox_y2 = bbox
         jittered_bbox = (bbox_x1-x_offset, bbox_y1-y_offset, bbox_x2 + x_offset, bbox_y2 + y_offset)
@@ -912,7 +1068,8 @@ class Pascal3DDataset(object):
             augmented_image, augmented_output_vector = self._mirror_image(augmented_image, augmented_output_vector)
             
         if blur:
-            augmented_image = cv2.GaussianBlur(augmented_image, (3, 3), 0)
+            std_x, std_y =  np.random.randint(0,20,size=2)
+            augmented_image = cv2.GaussianBlur(augmented_image, (3, 3), sigmaX=std_x, sigmaY=std_y)
         
         return augmented_image, augmented_output_vector.astype(np.float)
         
@@ -947,6 +1104,8 @@ class Pascal3DDataset(object):
             data = self.get_data(i)
         
         img = data['img']
+        print("Image")
+        print(img)
         objects = data['objects']
         class_cads = data['class_cads']
 
