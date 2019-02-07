@@ -206,7 +206,7 @@ def rotate_full_pose_space():
 
 def render_at_viewpoint():
     # Render to correct place - we want to do this for each model type
-    current_obj.rotation_euler = (0, 0, 0)
+    # current_obj.rotation_euler = (0, 0, 0)
     current_obj.location = (0, 0, 0)
     print(args.radians)
     print("Rotation Tuple")
