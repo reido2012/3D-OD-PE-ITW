@@ -142,16 +142,18 @@ def train_input_fn():
     """
     Builds an input pipeline that yields batches of feature and label pairs
     """
-    dataset = tf.data.TFRecordDataset(TRAINING_TFRECORDS).repeat(count=10) #Train for count epochs
+    dataset = tf.data.TFRecordDataset(TRAINING_TFRECORDS)
     dataset = dataset_base(dataset)
+    dataset = dataset.repeat(count=10) #Train for count epochs
     
     iterator = dataset.make_one_shot_iterator()
     features, labels = iterator.get_next()
     return features, labels
 
 def predict_input_fn():
-    dataset = tf.data.TFRecordDataset(EVAL_TEST_TFRECORDS).repeat(count=1)
+    dataset = tf.data.TFRecordDataset(EVAL_TEST_TFRECORDS)
     dataset = dataset_base(dataset, shuffle=False)
+    dataset = dataset.repeat(count=1)
     
     iterator = dataset.make_one_shot_iterator()
     features, labels = iterator.get_next()
@@ -183,6 +185,7 @@ def tfrecord_parser(serialized_example):
         }
     )
 
+    #TODO: Do the random stuff
     # Convert Scalar String to uint8
     input_image = tf.decode_raw(features['object_image'], tf.uint8)
     input_image = tf.to_float(input_image)

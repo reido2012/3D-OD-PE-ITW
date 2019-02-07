@@ -15,6 +15,6 @@ setup(
         "scikit-learn",
         "opencv-python",
         "opencv-contrib-python",
-        "click"
+        "argparse"
     ],
 )
