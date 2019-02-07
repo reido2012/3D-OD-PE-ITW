@@ -10,7 +10,7 @@ import argparse, sys, os
 
 def rotation_tuple(s):
     try:
-        x, y, z = map(int, s.split(','))
+        x, y, z = map(float, s.split(','))
         return (x, y, z)
     except:
         raise argparse.ArgumentTypeError("rotation values must be x,y,z")
@@ -31,6 +31,8 @@ parser.add_argument('--remove_doubles', type=bool, default=True,
                     help='Remove double vertices to improve mesh quality.')
 parser.add_argument('--edge_split', type=bool, default=True,
                     help='Adds edge split filter.')
+parser.add_argument('--radians', type=bool, default=False,
+                    help='Tells us if viewpoint is given in radians')
 parser.add_argument('--specific_viewpoint', type=bool, default=False,
                     help='True when you want to use to render a single depth map from a particulary viewpoint .')
 parser.add_argument('--viewpoint', help="Tuple of XYZ rotation", dest="rotation_tuple", default=(0,0,0), type=rotation_tuple, nargs='+')
@@ -80,7 +82,7 @@ else:
     map.use_max = True
     map.max = [1]
 
-    links.new(render_layers.outputs['Z'], map.inputs[0])
+    links.new(render_layers.outputs['Depth'], map.inputs[0])
     links.new(map.outputs[0], depth_file_output.inputs[0])
     
     # New
@@ -136,8 +138,8 @@ def parent_obj_to_camera(b_camera):
 
 
 scene = bpy.context.scene
-scene.render.resolution_x = 224
-scene.render.resolution_y = 224
+scene.render.resolution_x = 700
+scene.render.resolution_y = 700
 scene.render.resolution_percentage = 100
 scene.render.alpha_mode = 'TRANSPARENT'
 cam = scene.objects['Camera']
@@ -179,7 +181,8 @@ def render_image(directory_path, img_name):
     print(scene.render.filepath)
     depth_file_output.file_slots[0].path = scene.render.filepath + "_"
     bpy.ops.render.render(write_still=True)  # render still
-    
+
+
 def rotate_full_pose_space():
     """
     Render depth image for model in full pose space - discretized to 30 degree intervals
@@ -188,7 +191,7 @@ def rotate_full_pose_space():
     current_obj.rotation_euler = (0, 0, 0)
     current_obj.location = (0,0,0)
     
-    for rot_x  in range(-180, 180, 30) :
+    for rot_x  in range(-180, 180, 30):
         current_obj.rotation_euler[0] = radians(rot_x)
         
         for rot_z in range(0, 360, 30):
@@ -200,13 +203,26 @@ def rotate_full_pose_space():
                 img_id = "x_" + str(rot_x) + "_z_"+str(rot_z)+ "_y_" + str(rot_y)
                 render_image(fp, img_id )
 
+
 def render_at_viewpoint():
     # Render to correct place - we want to do this for each model type
-#     current_obj.rotation_euler = args.rotation_tuple[0]
-    current_obj.rotation_euler[0] = args.rotation_tuple[0][0]
-    current_obj.rotation_euler[1] = args.rotation_tuple[0][1]
-    current_obj.rotation_euler[2] = args.rotation_tuple[0][2]
-    
+    current_obj.rotation_euler = (0, 0, 0)
+    current_obj.location = (0, 0, 0)
+    print(args.radians)
+    print("Rotation Tuple")
+    print(args.rotation_tuple[0])
+
+    if not args.radians:
+        print("Converting from Degrees to Radians")
+        actual_rotation_tuple = []
+        for angle in args.rotation_tuple[0]:
+            actual_rotation_tuple.append(radians(angle))
+        print(actual_rotation_tuple)
+        current_obj.rotation_euler = tuple(actual_rotation_tuple)
+    else:
+        current_obj.rotation_euler = args.rotation_tuple[0]
+
+    print(current_obj.rotation_euler)
     directory_path = args.output_folder
     render_image(directory_path, args.cad_index)
     

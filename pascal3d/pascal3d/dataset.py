@@ -33,14 +33,13 @@ import tqdm
 
 from pascal3d import utils
 
-
 # UNIT_CUBE = np.array([[-0.5,0.5,-0.5],[-0.5,0.5,0.5], [-0.5, -0.5, -0.5], [-0.5, -0.5, 0.5], [0.5, 0.5, -0.5], [0.5, 0.5, 0.5], [0.5, -0.5, 0.5], [0.5, -0.5,0.5]])
 # UNIT_CUBE = np.array(list(product([-1, 1], [-1, 1], [-1, 1])))
 UNIT_CUBE = np.array(list(product([-0.5, 0.5], [-0.5, 0.5], [-0.5, 0.5])))
-DATASET_DIR = osp.expanduser('/home/omarreid/selerio/datasets/pascal3d/PASCAL3D+_release1.1')
+DATASET_DIR = osp.expanduser('/Users/omarreid/Documents/2D23D/PASCAL3D+_release1.1')
 IMAGENET_IMAGESET_DIR = DATASET_DIR + "/Image_sets/"
 PASCAL_IMAGESET_DIR = DATASET_DIR + "/PASCAL/VOCdevkit/VOC2012/ImageSets/Main/"
-
+OBJ_DIR = DATASET_DIR + "/OBJ/"
 
 class Pascal3DAnnotation(object):
 
@@ -49,7 +48,7 @@ class Pascal3DAnnotation(object):
 
         self.img_filename = ann_data['record']['filename'][0][0][0]
         self.database = ann_data['record']['database']
-        
+
         if self.database == 'ImageNet':
             self.segmented = True
         else:
@@ -103,7 +102,6 @@ class Pascal3DAnnotation(object):
 
 
 class Pascal3DDataset(object):
-
     voc2012_class_names = [
         'background',
         'aeroplane',
@@ -144,7 +142,8 @@ class Pascal3DDataset(object):
         'tvmonitor',
     ]
 
-    def __init__(self, data_type, generate=True, dataset_path="/home/omarreid/selerio/datasets/pascal3d/PASCAL3D+_release1.1"):
+    def __init__(self, data_type, generate=True,
+                 dataset_path="/home/omarreid/selerio/datasets/pascal3d/PASCAL3D+_release1.1"):
         assert data_type in ('train', 'val', 'all')
         self.dataset_dir = osp.expanduser(dataset_path)
         # get all data ids
@@ -154,18 +153,18 @@ class Pascal3DDataset(object):
             print(self.class_names[1:])
             for counter, cls in enumerate(self.class_names[1:]):
                 pascal_cls_ann_dir = osp.join(self.dataset_dir, 'Annotations/{}_pascal'.format(cls))
-                imagenet_class_ann_dir = osp.join(self.dataset_dir,'Annotations/{}_imagenet'.format(cls))
+                imagenet_class_ann_dir = osp.join(self.dataset_dir, 'Annotations/{}_imagenet'.format(cls))
                 all_annotation_dirs = glob.glob(pascal_cls_ann_dir) + glob.glob(imagenet_class_ann_dir)
                 for annotation_directory in all_annotation_dirs:
                     for ann_file in glob.glob(annotation_directory + "/*.mat"):
                         ann = Pascal3DAnnotation(ann_file)
                         if not ann.segmented:
                             continue
-                        #print("Ann File Path: {}".format(ann_file))
+                        # print("Ann File Path: {}".format(ann_file))
                         data_id = ann_file.split("/")[-1][:-4]
-                        #print("Data Id: {}".format(data_id))
+                        # print("Data Id: {}".format(data_id))
                         data_ids.append(data_id)
-                   
+
             print(len(set(data_ids)))
             print('Done.')
             data_ids = list(set(data_ids))
@@ -184,8 +183,8 @@ class Pascal3DDataset(object):
         return len(self.data_ids)
 
     def get_data(self, i, data_id=None):
-        
-        if not data_id: 
+
+        if not data_id:
             data_id = self.data_ids[i]
 
         data = {
@@ -196,19 +195,25 @@ class Pascal3DDataset(object):
         }
 
         for class_name in self.class_names[1:]:
-            ann_file = osp.join(self.dataset_dir,'Annotations/{}_pascal/{}.mat'.format(class_name, data_id))
+            ann_file = osp.join(self.dataset_dir, 'Annotations/{}_pascal/{}.mat'.format(class_name, data_id))
             if not osp.exists(ann_file):
-                ann_file = osp.join(self.dataset_dir,'Annotations/{}_imagenet/{}.mat'.format(class_name, data_id))
+                ann_file = osp.join(self.dataset_dir, 'Annotations/{}_imagenet/{}.mat'.format(class_name, data_id))
                 if not osp.exists(ann_file):
                     continue
-            
+
             ann = Pascal3DAnnotation(ann_file)
-            #When creating the TF.Records we don't care about label cls
-            #and ann.database != "ImageNet" and data_id is None
-            if data['label_cls'] is None :
+            # When creating the TF.Records we don't care about label cls
+            # and ann.database != "ImageNet" and data_id is None
+            if data['label_cls'] is None and ann.database != "ImageNet" and data_id is None:
                 label_cls_file = osp.join(
                     self.dataset_dir,
                     'PASCAL/VOCdevkit/VOC2012/SegmentationClass/{}.png'.format(data_id))
+
+                if not osp.exists(label_cls_file):
+                    label_cls_file = osp.join(
+                        self.dataset_dir,
+                        'PASCAL/VOCdevkit/VOC2012/SegmentationClass/{}.jpg'.format(data_id))
+
                 label_cls = PIL.Image.open(label_cls_file)
                 label_cls = np.array(label_cls)
                 label_cls[label_cls == 255] = 0  # set boundary as background
@@ -233,13 +238,13 @@ class Pascal3DDataset(object):
             if data['img'] is None:
                 needle = 'Images/{}_pascal'
                 if ann.database == "ImageNet":
-                    needle  = 'Images/{}_imagenet'
+                    needle = 'Images/{}_imagenet'
 
                 img_file = osp.join(
                     self.dataset_dir,
                     needle.format(class_name),
                     ann.img_filename)
-                
+
                 data['img'] = scipy.misc.imread(img_file)
 
             for obj in ann.objects:
@@ -285,9 +290,9 @@ class Pascal3DDataset(object):
     def show_cad(self, i, camframe=False):
         if camframe:
             return self.show_cad_camframe(i)
-        
+
         data = self.get_data(i)
-        
+
         img = data['img']
         objects = data['objects']
         class_cads = data['class_cads']
@@ -425,12 +430,12 @@ class Pascal3DDataset(object):
         plt.show()
 
     def show_cad_overlay(self, i, data_id):
-        
-        if data_id: 
+
+        if data_id:
             data = self.get_data(i, data_id=data_id)
         else:
             data = self.get_data(i)
-        
+
         img = data['img']
         objects = data['objects']
         class_cads = data['class_cads']
@@ -455,7 +460,7 @@ class Pascal3DDataset(object):
 
             patches = []
             for face in faces:
-                points = [vertices_2d[i_vertex-1] for i_vertex in face]
+                points = [vertices_2d[i_vertex - 1] for i_vertex in face]
                 poly = Polygon(points, True)
                 patches.append(poly)
             p = PatchCollection(patches, cmap=matplotlib.cm.jet, alpha=0.4)
@@ -463,7 +468,7 @@ class Pascal3DDataset(object):
 
         plt.tight_layout()
         plt.show()
-    
+
     def create_patch_collection_from_vertices(self, vertices_2d, faces):
         """
         Create surface of CAD model in 2D from it's vertices and faces
@@ -473,90 +478,89 @@ class Pascal3DDataset(object):
         """
         patches = []
         for face in faces:
-            points = [vertices_2d[i_vertex-1] for i_vertex in face]
+            points = [vertices_2d[i_vertex - 1] for i_vertex in face]
             poly = Polygon(points, True)
             patches.append(poly)
-    
+
         return PatchCollection(patches, cmap=matplotlib.cm.jet, alpha=0.4)
-    
+
     def _get_pascal_data_ids(self):
         """
         Read data ids from pascal train, val and test text files
         """
-        files = [PASCAL_IMAGESET_DIR + "train.txt", PASCAL_IMAGESET_DIR + "test.txt",  PASCAL_IMAGESET_DIR + "val.txt"]        
+        files = [PASCAL_IMAGESET_DIR + "train.txt", PASCAL_IMAGESET_DIR + "test.txt", PASCAL_IMAGESET_DIR + "val.txt"]
         return list(map(self._read_ids_from_file, files))
-    
+
     def _get_imagenet_ids(self):
         """
         Read data ids from imagenet train and val text files
         """
         training_files = glob.glob(IMAGENET_IMAGESET_DIR + "*_imagenet_train.txt")
         validation_files = glob.glob(IMAGENET_IMAGESET_DIR + "*_imagenet_val.txt")
-        
+
         training_ids = list(map(self._read_ids_from_file, training_files))
-        all_training_ids = [data_id for id_list in training_ids for data_id in id_list] #Flatten
-        
+        all_training_ids = [data_id for id_list in training_ids for data_id in id_list]  # Flatten
+
         validation_ids = list(map(self._read_ids_from_file, validation_files))
         all_validation_ids = [data_id for id_list in validation_ids for data_id in id_list]
-        
+
         return (all_training_ids, all_validation_ids)
-    
+
     def _read_ids_from_file(self, filepath):
         """
         Reads ids from txt file where each line in file is a separate id
         """
-        
+
         with open(filepath, 'r') as file:
             lines = file.readlines()
-        
+
         return [line.rstrip() for line in lines]
-    
-        
+
     def create_tfrecords(self, debug=False):
         """
         Create TF.Records file for traning or dataset
         """
-        
-        #Get all text files containing ids
-        pascal_train_ids, pascal_test_ids, pascal_val_ids = self._get_pascal_data_ids()        
+
+        # Get all text files containing ids
+        pascal_train_ids, pascal_test_ids, pascal_val_ids = self._get_pascal_data_ids()
         imagenet_train_ids, imagenet_val_ids = self._get_imagenet_ids()
-        
-        record_map ={    
+
+        record_map = {
             "pascal_train": pascal_train_ids,
-#             "pascal_test": pascal_test_ids,
-#             "pascal_val": pascal_val_ids,
+            #             "pascal_test": pascal_test_ids,
+            #             "pascal_val": pascal_val_ids,
             "imagenet_train": imagenet_train_ids,
             "imagenet_val": imagenet_val_ids
         }
-        
+
         for name, id_list in record_map.items():
             tfrecords_filename = '{}.tfrecords'.format(name)
             print("Starting: {}".format(tfrecords_filename))
             self._create_tfrecords_from_data_ids(tfrecords_filename, id_list, debug)
             print("Finished: {}".format(tfrecords_filename))
-    
-    
-    def create_tfrecords_synth_domain(self):
-        pascal_train_ids, pascal_test_ids, pascal_val_ids = self._get_pascal_data_ids()        
+
+    def create_tfrecords_synth_domain(self, path_to_save_records, local):
+        pascal_train_ids, pascal_test_ids, pascal_val_ids = self._get_pascal_data_ids()
         imagenet_train_ids, imagenet_val_ids = self._get_imagenet_ids()
-        
-        record_map ={    
-            "pascal_train": pascal_train_ids,
-#             "pascal_test": pascal_test_ids,
-            "pascal_val": pascal_val_ids,
+
+        record_map = {
+            # "pascal_train": pascal_train_ids,
+            #             "pascal_test": pascal_test_ids,
+            # "pascal_val": pascal_val_ids,
             "imagenet_train": imagenet_train_ids,
-            "imagenet_val": imagenet_val_ids
+            # "imagenet_val": imagenet_val_ids
         }
-        
+
         for name, id_list in record_map.items():
             tfrecords_filename = '{}.tfrecords'.format(name)
             print("Starting: {}".format(tfrecords_filename))
-            self._create_synth_tfrecords_from_data_ids(tfrecords_filename, id_list, False)
+            self._create_synth_tfrecords_from_data_ids(tfrecords_filename, id_list, path_to_save_records, local)
             print("Finished: {}".format(tfrecords_filename))
-    
+            return
+
     def _set_image_operations(self, img):
         height, width, _ = img.shape
-            
+
         if max(height, width) > 224:
             apply_blur = 1
             apply_random_crops = True
@@ -565,127 +569,147 @@ class Pascal3DDataset(object):
             apply_random_crops = False
 
         return apply_blur, apply_random_crops
-    
-    def _create_synth_tfrecords_from_data_ids(self, record_name, ids, debug):
-        writer = tf.python_io.TFRecordWriter("/home/omarreid/selerio/synth_domain_records/"+record_name)
+
+    def _create_synth_tfrecords_from_data_ids(self, record_name, ids, path_to_save_records, local):
+        writer = tf.python_io.TFRecordWriter(path_to_save_records + record_name)
         skipped = []
-        
+        print(len(ids))
         for data_id in ids:
-           
+
             data = self.get_data(0, data_id=data_id)
             if data['img'] is None:
                 print("No Image")
-                #Annotation Not Find for Data ID
+                # Annotation Not Find for Data ID
                 skipped.append(str(data_id) + "\n")
                 continue
             img = data['img']
-            
+
             if (len(img.shape)) < 3:
                 print("Greyscale")
-                #Image is greyscale
+                # Image is greyscale
                 skipped.append(str(data_id) + "\n")
                 continue
-             
+
             original_img = img
             objects = data['objects']
             class_cads = data['class_cads']
-#             print(f"Data ID: {data_id}")
-                
-            for counter, (cls, obj) in enumerate(objects):
-                if obj['skip'] and  record_name == 'pascal_val.tfrecords':
-                    # We only want to evaluate on non truncated/occluded objects
-                    #Skip object if it is truncated 
-                    skipped.append("Object: "+ str(counter) + " In Image: " + str(data_id) + "\n")
-                    continue
-                
-                print("Getting Information:")
-                virtual_control_points_2d, bbox_3d_dims = self._get_real_domain_output_vector(cls, class_cads,obj)
-                bbox = obj['bbox'] 
-                cropped_img, square_bbox= self._crop_object_from_img(img, bbox)
-                resized_img = scipy.misc.imresize(cropped_img, (224,224))
-                cad_index = obj['cad_index']
-                
-                
-                R, R_rot = utils.get_transformation_matrix(
-                obj['viewpoint']['azimuth'],
-                obj['viewpoint']['elevation'],
-                obj['viewpoint']['distance'],
-                )
-#                 print(f"Rotation Matrix: {R_rot}")
-                rotation_tuple = self._rotation_matrix_to_euler_angles(R_rot)   
-#                 print(f"Rotation Tuple: {rotation_tuple}")
-                cad_index = self.get_cad_number(cad_index)
-#                 print(f"Cad Index: {cad_index}")
+            #             print(f"Data ID: {data_id}")
 
-                positive_depth_map_image_path = self.render_for_dataset(cls, cad_index, rotation_tuple, data_id)
+            for counter, (cls, obj) in enumerate(objects):
+                if obj['skip'] and record_name == 'pascal_val.tfrecords':
+                    # We only want to evaluate on non truncated/occluded objects
+                    # Skip object if it is truncated
+                    skipped.append("Object: " + str(counter) + " In Image: " + str(data_id) + "\n")
+                    continue
+
+                print("Getting Information:")
+                virtual_control_points_2d, bbox_3d_dims = self._get_real_domain_output_vector(cls, class_cads, obj)
+                bbox = obj['bbox']
+                cropped_img, square_bbox = self._crop_object_from_img(img, bbox)
+                resized_img = scipy.misc.imresize(cropped_img, (224, 224))
+                cad_index = obj['cad_index']
+
+                R, R_rot = utils.get_transformation_matrix(
+                    obj['viewpoint']['azimuth'],
+                    obj['viewpoint']['elevation'],
+                    obj['viewpoint']['distance'],
+                )
+                print(f"Rotation Matrix: {R_rot}")
+                rotation_tuple = self._rotation_matrix_to_euler_angles(R_rot)
+                #                 print(f"Rotation Tuple: {rotation_tuple}")
+                print(f"Cad Index: {cad_index}")
+                cad_index = self.get_cad_number(cad_index)
+                print(f"Cad Index: {cad_index}")
+
+                positive_depth_map_image_path = self.render_for_dataset(cls, cad_index, rotation_tuple, data_id, OBJ_DIR, local=local)
                 print("PD Image Path: " + positive_depth_map_image_path)
                 return
                 positive_depth_image = scipy.misc.imread(positive_depth_map_image_path)
-                
-                self._write_synth_record(writer, resized_img, positive_depth_image, rotation_tuple, cad_index, cls, data_id)
-                
+
+                self._write_synth_record(writer, resized_img, positive_depth_image, rotation_tuple, cad_index, cls,
+                                         data_id)
+
                 return
             return
-    
+        return
+
     def get_cad_number(self, cad_index):
         index = int(cad_index) + 1
         return '0' + str(index)
-    def render_for_dataset(self, image_class, cad_index, rotation_xyz, record_id):
+
+    def render_for_dataset(self, image_class, cad_index, rotation_xyz, record_id, path_to_objs, local=False):
         x_rotation, y_rotation, z_rotation = rotation_xyz
-        
-        x_rotation = int(round(x_rotation))
-        y_rotation = int(round(y_rotation))
-        z_rotation = int(round(z_rotation))
-        
-        #render for each object in CAD_OBJ in image_class
+
+        # x_rotation = int(round(x_rotation))
+        # y_rotation = int(round(y_rotation))
+        # z_rotation = int(round(z_rotation))
+
+        print(str(x_rotation))
+        print(str(y_rotation))
+        print(str(z_rotation))
+        # render for each object in CAD_OBJ in image_class
         # return path to depth image and we want - gt_index
-        for object_path in glob.glob("/home/omarreid/selerio/datasets/pascal3d/PASCAL3D+_release1.1/CAD_OBJ/" + image_class + "/*.obj"):
+
+        for object_path in glob.glob(path_to_objs + image_class + "/*.obj"):
 
             curr_obj_cad_index = object_path.split("/")[-1].split(".")[0]
 
-            command = "nvidia-docker run -v /home/omarreid/selerio/:/workdir peterlauri/blender-python:latest blender -noaudio --background --python /workdir/pix3d/blender_render.py --  --specific_viewpoint True --cad_index " +  curr_obj_cad_index + " --viewpoint=" + str(x_rotation) + "," + str(y_rotation) + "," + str(z_rotation) + " --output_folder /workdir/pix3d/synth_renderings/" + str(record_id) + " "
-        
+            command = "nvidia-docker run -v /home/omarreid/selerio/:/workdir peterlauri/blender-python:latest blender " \
+                      "-noaudio --background --python /workdir/pix3d/blender_render.py --  --specific_viewpoint True " \
+                      "--cad_index " + curr_obj_cad_index + " --viewpoint=" + str(
+                x_rotation) + "," + str(y_rotation) + "," + str(
+                z_rotation) + " --output_folder /workdir/pix3d/synth_renderings/" + str(record_id) + " "
+
+            if local:
+                command = "/Applications/Blender/blender.app/Contents/MacOS/blender -noaudio --background --python ./blender_render.py -- --specific_viewpoint=True " \
+                          "--cad_index=" + curr_obj_cad_index + " --radians=True --viewpoint=" + str(x_rotation) + "," + str(
+                    y_rotation) + "," + str(
+                    z_rotation) + " --output_folder ./synth_renderings/" + str(record_id) + " "
+
             print("Object Path: " + object_path)
-            print("Curr CAD INDEX: " + str(curr_obj_cad_index) )
-            print("Class: " + str(image_class) )
+            print("Curr CAD INDEX: " + str(curr_obj_cad_index))
+            print("Class: " + str(image_class))
             print("Command: " + command)
 
-            docker_object_path = "/workdir/" + "/".join(object_path.split("/")[4:])
-            full_command = command + docker_object_path
+            if not local:
+                object_path = "/workdir/" + "/".join(object_path.split("/")[4:])
+
+            full_command = command + object_path
+
             try:
                 process = subprocess.run(full_command.split(), check=True)
             except subprocess.CalledProcessError as e:
                 print(e)
                 raise e
-    
+
         return "/home/omarreid/selerio/pix3d/synth_renderings/" + str(record_id) + "/" + str(cad_index) + "_0001.png"
-        
-    def _is_rotation_matrix(self, R) :
+
+    def _is_rotation_matrix(self, R):
         Rt = np.transpose(R)
         shouldBeIdentity = np.dot(Rt, R)
-        I = np.identity(3, dtype = R.dtype)
+        I = np.identity(3, dtype=R.dtype)
         n = np.linalg.norm(I - shouldBeIdentity)
         return n < 1e-6
- 
-    def _rotation_matrix_to_euler_angles(self, R) :
 
-        assert(self._is_rotation_matrix(R))
+    def _rotation_matrix_to_euler_angles(self, R):
 
-        sy = math.sqrt(R[0,0] * R[0,0] +  R[1,0] * R[1,0])
+        assert (self._is_rotation_matrix(R))
+
+        sy = math.sqrt(R[0, 0] * R[0, 0] + R[1, 0] * R[1, 0])
 
         singular = sy < 1e-6
 
-        if  not singular :
-            x = math.atan2(R[2,1] , R[2,2])
-            y = math.atan2(-R[2,0], sy)
-            z = math.atan2(R[1,0], R[0,0])
-        else :
-            x = math.atan2(-R[1,2], R[1,1])
-            y = math.atan2(-R[2,0], sy)
+        if not singular:
+            x = math.atan2(R[2, 1], R[2, 2])
+            y = math.atan2(-R[2, 0], sy)
+            z = math.atan2(R[1, 0], R[0, 0])
+        else:
+            x = math.atan2(-R[1, 2], R[1, 1])
+            y = math.atan2(-R[2, 0], sy)
             z = 0
 
-        return np.array([math.degrees(x), math.degrees(y), math.degrees(z)])
-            
+        return np.array([x, y, z])
+
     def _create_tfrecords_from_data_ids(self, record_name, ids, debug):
         """
             Creates TFRecords for a set of ids
@@ -693,111 +717,114 @@ class Pascal3DDataset(object):
                 record_name: The name of the TFRecords file
                 ids: list of data ids        
         """
-        
-        writer = tf.python_io.TFRecordWriter("/notebooks/selerio/tf_records_blur_only/"+record_name)
+
+        writer = tf.python_io.TFRecordWriter("/notebooks/selerio/tf_records_blur_only/" + record_name)
         skipped = []
         for data_id in tqdm.tqdm(ids):
-            
+
             data = self.get_data(0, data_id=data_id)
-            
+
             if data['img'] is None:
-                #Annotation Not Find for Data ID
+                # Annotation Not Find for Data ID
                 skipped.append(str(data_id) + "\n")
                 continue
-            
+
             img = data['img']
-            
+
             if (len(img.shape)) < 3:
-                #Image is greyscale
+                # Image is greyscale
                 skipped.append(str(data_id) + "\n")
                 continue
-                
+
             apply_blur, apply_random_crops = self._set_image_operations
-             
+
             original_img = img
             objects = data['objects']
             class_cads = data['class_cads']
 
-            if debug: 
-                fig = plt.figure()            
-                ax2 = plt.subplot(1,1,1)
+            if debug:
+                fig = plt.figure()
+                ax2 = plt.subplot(1, 1, 1)
                 ax2.imshow(img)
-            
+
             # Create a TF Record for each object in record
             for counter, (cls, obj) in enumerate(objects):
-                if obj['skip'] and  record_name == 'pascal_val.tfrecords':
+                if obj['skip'] and record_name == 'pascal_val.tfrecords':
                     # We only want to evaluate on non truncated/occluded objects
-                    #Skip object if it is truncated 
-                    skipped.append("Object: "+ str(counter) + " In Image: " + str(data_id) + "\n")
+                    # Skip object if it is truncated
+                    skipped.append("Object: " + str(counter) + " In Image: " + str(data_id) + "\n")
                     continue
-               
+
                 virtual_control_points_2d, bbox_3d_dims = self._get_real_domain_output_vector(
-                    cls, class_cads,obj)
-                
-                bbox = obj['bbox'] 
-                
+                    cls, class_cads, obj)
+
+                bbox = obj['bbox']
+
                 # Create a Rectangle patch
                 if debug:
-                    rect = patches.Rectangle((bbox[0],bbox[1]),bbox[2]-bbox[0],bbox[3]-bbox[1],linewidth=1,edgecolor='r',facecolor='none')
+                    rect = patches.Rectangle((bbox[0], bbox[1]), bbox[2] - bbox[0], bbox[3] - bbox[1], linewidth=1,
+                                             edgecolor='r', facecolor='none')
                     # Add the patch to the Axes
                     ax2.add_patch(rect)
-                    
-                cropped_img, square_bbox= self._crop_object_from_img(img, bbox)
-                
+
+                cropped_img, square_bbox = self._crop_object_from_img(img, bbox)
+
                 if debug:
-                    rect2 = patches.Rectangle((square_bbox[0],square_bbox[1]),square_bbox[2]-square_bbox[0],square_bbox[3]-square_bbox[1],linewidth=1,edgecolor='b',facecolor='none')
+                    rect2 = patches.Rectangle((square_bbox[0], square_bbox[1]), square_bbox[2] - square_bbox[0],
+                                              square_bbox[3] - square_bbox[1], linewidth=1, edgecolor='b',
+                                              facecolor='none')
                     ax2.add_patch(rect2)
-                
-                
-                normalized_virtual_control_points = self._normalize_2d_control_points(virtual_control_points_2d, square_bbox)
+
+                normalized_virtual_control_points = self._normalize_2d_control_points(virtual_control_points_2d,
+                                                                                      square_bbox)
                 output_vector = np.append(normalized_virtual_control_points, bbox_3d_dims).astype(np.float)
-                
-                resized_img = scipy.misc.imresize(cropped_img, (224,224))
-                
-                #One TF Record with normal image
+
+                resized_img = scipy.misc.imresize(cropped_img, (224, 224))
+
+                # One TF Record with normal image
                 self._write_record(writer, resized_img, output_vector, False, False, False, cls, data_id, counter)
-                
+
                 # Don't want to augment validation images
                 if record_name != 'pascal_val.tfrecords':
                     image = resized_img
                     blur = True if (apply_blur == 1) else False
 
-
-#                     mirror = True
-#                     image, output_vector = self._augment_image(image, output_vector, blur=blur, mirror=mirror)
-#                     self._write_record(writer, image, output_vector, blur, False, False, cls, data_id, counter)
+                    #                     mirror = True
+                    #                     image, output_vector = self._augment_image(image, output_vector, blur=blur, mirror=mirror)
+                    #                     self._write_record(writer, image, output_vector, blur, False, False, cls, data_id, counter)
 
                     mirror = False
                     if blur:
                         image, output_vector = self._augment_image(image, output_vector, blur=blur, mirror=mirror)
                         self._write_record(writer, image, output_vector, blur, False, mirror, cls, data_id, counter)
 
-#                     if apply_random_crops:
-#                         all_random_crops, output_vector = self._create_random_crops(original_img, bbox, virtual_control_points_2d, bbox_3d_dims)
+        #                     if apply_random_crops:
+        #                         all_random_crops, output_vector = self._create_random_crops(original_img, bbox, virtual_control_points_2d, bbox_3d_dims)
 
-#                         for random_crop in all_random_crops:
-#                             self._write_record(writer, random_crop, output_vector, False, True, False, cls, data_id, counter)
-                    
+        #                         for random_crop in all_random_crops:
+        #                             self._write_record(writer, random_crop, output_vector, False, True, False, cls, data_id, counter)
+
         writer.close()
 
         if debug:
             plt.show()
-        
+
         if len(skipped) > 0:
             print("Skipped {} Objects".format(len(skipped)))
             print("*********************")
             print(skipped)
-            
+
             with open(record_name + '_skipped.txt', 'w') as file:
                 file.writelines(skipped)
-    
-    def _write_record(self, record_writer, image, output_vector, apply_blur, jittered, mirrored, object_cls, data_id, object_index):
+
+    def _write_record(self, record_writer, image, output_vector, apply_blur, jittered, mirrored, object_cls, data_id,
+                      object_index):
         img_raw = image.tostring()
-           
+
         feature = {
-            'object_image':  self._bytes_feature(img_raw),
+            'object_image': self._bytes_feature(img_raw),
             'output_vector': self._floats_feature(output_vector),
-            'blurred':self._int64_feature(apply_blur), 
+            'blurred': self._int64_feature(apply_blur),
             'mirrored': self._int64_feature(int(mirrored)),
             'jittered': self._int64_feature(int(jittered)),
             'object_class': self._bytes_feature(object_cls.encode('utf-8')),
@@ -807,11 +834,12 @@ class Pascal3DDataset(object):
 
         example = tf.train.Example(features=tf.train.Features(feature=feature))
         record_writer.write(example.SerializeToString())
-        
-    def _write_synth_record(self, record_writer, image, positive_depth_map_image, rotation_tuple, cad_index, object_class, uid):
+
+    def _write_synth_record(self, record_writer, image, positive_depth_map_image, rotation_tuple, cad_index,
+                            object_class, uid):
         img_raw = image.tostring()
         depth_img_raw = positive_depth_map_image.tostring()
-        
+
         feature = {
             'object_image': self._bytes_feature(img_raw),
             'positive_depth_image': self._bytes_feature(depth_img_raw),
@@ -819,32 +847,30 @@ class Pascal3DDataset(object):
             'unique_id': self._bytes_feature(uid.encode('utf-8')),
             'cad_index': self._int64_feature(cad_index)
         }
-        
+
         example = tf.train.Example(features=tf.train.Features(feature=feature))
         record_writer.write(example.SerializeToString())
-    
-    
-    
+
     def _create_random_crops(self, img, bbox, virtual_control_points_2d, bbox_3d_dims, number_of_crops=4):
         x_offset = y_offset = 16
         bbox_x1, bbox_y1, bbox_x2, bbox_y2 = bbox
-        jittered_bbox = (bbox_x1-x_offset, bbox_y1-y_offset, bbox_x2 + x_offset, bbox_y2 + y_offset)
-        jittered_img, jittered_square_bbox= self._crop_object_from_img(img, jittered_bbox)
+        jittered_bbox = (bbox_x1 - x_offset, bbox_y1 - y_offset, bbox_x2 + x_offset, bbox_y2 + y_offset)
+        jittered_img, jittered_square_bbox = self._crop_object_from_img(img, jittered_bbox)
         j_h, j_w, _ = jittered_img.shape
-        crop_dims = 5*(224 //8)
-        
-        jittered_img = scipy.misc.imresize(jittered_img, (224,224))
+        crop_dims = 5 * (224 // 8)
+
+        jittered_img = scipy.misc.imresize(jittered_img, (224, 224))
         j_nvcp = self._normalize_2d_control_points(virtual_control_points_2d, jittered_square_bbox)
         jittered_ov = np.append(j_nvcp, bbox_3d_dims).astype(np.float)
-        
+
         r_crops = []
-        
+
         for i in range(number_of_crops):
             r_crop, _ = self._random_crop(jittered_img, crop_size=(crop_dims, crop_dims))
             r_crops.append(r_crop)
-        
+
         return r_crops, jittered_ov
-        
+
     def _random_crop(self, image, crop_size=(140, 140)):
         h, w, _ = image.shape
         top = np.random.randint(0, h - crop_size[0])
@@ -853,13 +879,13 @@ class Pascal3DDataset(object):
         bottom = top + crop_size[0]
         right = left + crop_size[1]
 
-        new_image = np.zeros((224,224,3), dtype=np.uint8)
+        new_image = np.zeros((224, 224, 3), dtype=np.uint8)
         new_image.fill(255)
         image_section = image[top:bottom, left:right, :]
 
         new_image[top:bottom, left:right, :] = image_section
         return new_image, image_section
-    
+
     def _crop_object_from_img(self, img, bbox):
         """
         Square crops image to the largest dimension of the bbox
@@ -875,9 +901,9 @@ class Pascal3DDataset(object):
         max_dim = self._get_bbox_max_dim(bbox)
 
         square_bbox = self._get_square_bounding_box_dimensions(max_dim, center)
-        
+
         return self._get_square_crop(square_bbox, img)
-        
+
     def _get_bbox_center(self, bbox):
         """
         Calculates the center of a bounding box
@@ -888,8 +914,8 @@ class Pascal3DDataset(object):
             center coordinates (x,y)
         """
         x1, y1, x2, y2 = bbox
-        return ((x1+x2)/2 , (y1+y2)/2)
-    
+        return ((x1 + x2) / 2, (y1 + y2) / 2)
+
     def _get_bbox_max_dim(self, bbox):
         """
         Calculates the maximum dimension of a bounding box
@@ -900,8 +926,8 @@ class Pascal3DDataset(object):
             maximum dimension
         """
         x1, y1, x2, y2 = bbox
-        return max(x2-x1, y2-y1)
-    
+        return max(x2 - x1, y2 - y1)
+
     def _get_square_bounding_box_dimensions(self, max_dim, center):
         """
         Create new square bounding box dimensions to square crop object.
@@ -913,15 +939,15 @@ class Pascal3DDataset(object):
             New points of a square bounding box
         """
         center_x, center_y = center
-        
-        y_max = int(max_dim/2 + center_y)
-        y_min = int(center_y - max_dim/2)
-        
-        x_max = int(max_dim/2 + center_x)
-        x_min = int(center_x - max_dim/2) 
-        
+
+        y_max = int(max_dim / 2 + center_y)
+        y_min = int(center_y - max_dim / 2)
+
+        x_max = int(max_dim / 2 + center_x)
+        x_min = int(center_x - max_dim / 2)
+
         return x_min, y_min, x_max, y_max
-        
+
     def _get_square_crop(self, square_bbox, img):
         """
         Create new square cropped and padded image
@@ -933,32 +959,31 @@ class Pascal3DDataset(object):
             Padded and square cropped image containing the object, and updated and bounding box
         """
         img_height, img_width, _ = img.shape
-        
-        #Square Bounding Box
+
+        # Square Bounding Box
         x_min, y_min, x_max, y_max = square_bbox
-        
+
         padding_x = 0
         padding_y = 0
-        
+
         if y_max > img_height:
             padding_y += (y_max - img_height)
 
         if y_min < 0:
             padding_y += (-y_min)
-            y_min=0
-            
+            y_min = 0
+
         if x_max > img_width:
             padding_x += (x_max - img_width)
-            
+
         if x_min < 0:
             padding_x += (-x_min)
-            x_min=0
-        
-        pad_width = ((0, padding_y), (0, padding_x), (0,0))
+            x_min = 0
+
+        pad_width = ((0, padding_y), (0, padding_x), (0, 0))
         padded_img = np.pad(img, pad_width=pad_width, mode='constant', constant_values=255)
-        
-        return padded_img[y_min:y_max, x_min:x_max], (x_min, y_min, x_max , y_max )
-    
+
+        return padded_img[y_min:y_max, x_min:x_max], (x_min, y_min, x_max, y_max)
 
     def _get_real_domain_output_vector(self, cls, class_cads, obj):
         """
@@ -976,12 +1001,12 @@ class Pascal3DDataset(object):
         cad = class_cads[cls][cad_index]
         cad_vertices_3d = cad['vertices']
         bbox = obj['bbox']
-        
+
         dx, dy, dz = self._compute_scalars(cad_vertices_3d)
         virtual_control_points_2d = self._get_bounding_box_corners_in_2d(cad_vertices_3d, obj['viewpoint'])
-        
-        return  virtual_control_points_2d, np.array([dx, dy, dz])
-    
+
+        return virtual_control_points_2d, np.array([dx, dy, dz])
+
     def _normalize_2d_control_points(self, control_points, bbox):
         """
         Normalize 2D Virtual Control Points 
@@ -992,16 +1017,16 @@ class Pascal3DDataset(object):
             Normalized control points (16 values)            
         """
         xmin, ymin, xmax, ymax = bbox
-        
+
         new_control_points = []
         for control_point in control_points:
             cx, cy = control_point
-            new_cx = (cx-xmin)/(xmax-xmin)
-            new_cy = (cy-ymin)/(ymax-ymin)
+            new_cx = (cx - xmin) / (xmax - xmin)
+            new_cy = (cy - ymin) / (ymax - ymin)
             new_control_points.append((new_cx, new_cy))
-            
+
         return np.array(new_control_points).flatten()
-    
+
     def _compute_scalars(self, cad_model_vertices):
         """
         Compute How much we should scale each axis of the unit cube
@@ -1016,14 +1041,14 @@ class Pascal3DDataset(object):
         x_range = max(x) - min(x)
         y_range = max(y) - min(y)
         z_range = max(z) - min(z)
- 
-        cube_length = abs(UNIT_CUBE[7,0] - UNIT_CUBE[0,0])
-        scalar_x = x_range/cube_length
-        scalar_y = y_range/cube_length
-        scalar_z = z_range/cube_length
-            
-        return scalar_x, scalar_y, scalar_z    
-    
+
+        cube_length = abs(UNIT_CUBE[7, 0] - UNIT_CUBE[0, 0])
+        scalar_x = x_range / cube_length
+        scalar_y = y_range / cube_length
+        scalar_z = z_range / cube_length
+
+        return scalar_x, scalar_y, scalar_z
+
     def _scale_unit_cube(self, cad_vertices_3d):
         """
         Scale unit cube to fit the cad model
@@ -1035,17 +1060,17 @@ class Pascal3DDataset(object):
             A unit cube scaled to fit the cad model
         """
         scalar_x, scalar_y, scalar_z = self._compute_scalars(cad_vertices_3d)
-        scale_matrix = np.array([[scalar_x, 0, 0, 0], [0, scalar_y, 0 ,0 ], [0, 0, scalar_z, 0 ], [0, 0, 0, 1]])
+        scale_matrix = np.array([[scalar_x, 0, 0, 0], [0, scalar_y, 0, 0], [0, 0, scalar_z, 0], [0, 0, 0, 1]])
         return self.apply_transformation(UNIT_CUBE, scale_matrix)
-        
+
     def _get_bounding_box_corners_in_2d(self, cad_vertices_3d, obj_viewpoint):
         """
             Scales a unit cube to fit the cad model then projects it to 2D 
         """
         scaled_cube_3d = self._scale_unit_cube(cad_vertices_3d)
-        #The projection below takes care of the transformation of the unit cube into the correct angle
+        # The projection below takes care of the transformation of the unit cube into the correct angle
         return utils.project_points_3d_to_2d(scaled_cube_3d, **obj_viewpoint)
-        
+
     def _bytes_feature(self, value):
         return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
@@ -1060,49 +1085,48 @@ class Pascal3DDataset(object):
         Applies specified augmentations to the preprocessed image, and makes the corresponding changes
         to the output_vector
         """
-        #Output Vector is Normalized!
+        # Output Vector is Normalized!
         augmented_output_vector = original_output_vector
         augmented_image = image
-        
+
         if mirror:
             augmented_image, augmented_output_vector = self._mirror_image(augmented_image, augmented_output_vector)
-            
+
         if blur:
-            std_x, std_y =  np.random.randint(0,20,size=2)
+            std_x, std_y = np.random.randint(0, 20, size=2)
             augmented_image = cv2.GaussianBlur(augmented_image, (3, 3), sigmaX=std_x, sigmaY=std_y)
-        
+
         return augmented_image, augmented_output_vector.astype(np.float)
-        
-        
+
     def _mirror_image(self, image, output_vector):
         """
         Flips image so that it becomes the mirror of the original image
         Also flips the virtual control points
         """
-        vc_points = np.array(output_vector[:16]).reshape(8,2)
+        vc_points = np.array(output_vector[:16]).reshape(8, 2)
         flipped_image = np.fliplr(image)
         flipped_vc_points = self._mirror_vc_points_2d(vc_points)
         output_vector[:16] = flipped_vc_points.flatten()
         return flipped_image, output_vector
-    
+
     def _mirror_vc_points_2d(self, vc_points, image_width=1):
         """
         Flips 2d virtual control points so that they are consistent with the mirror image
         """
-        vc_points[:, 0] = image_width - vc_points[:, 0] 
+        vc_points[:, 0] = image_width - vc_points[:, 0]
 
         return vc_points
-  
+
     def show_virtual_control_points(self, i, data_id):
         """
         Transform a 3D unit cube so that it becomes a 3D bounding box for CAD model
         Projects 3D bounding box to 2D to get virtual control points for objects in 2D image 
         """
-        if data_id: 
+        if data_id:
             data = self.get_data(i, data_id=data_id)
         else:
             data = self.get_data(i)
-        
+
         img = data['img']
         print("Image")
         print(img)
@@ -1110,84 +1134,82 @@ class Pascal3DDataset(object):
         class_cads = data['class_cads']
 
         fig = plt.figure()
-        ax2 = plt.subplot(1,1,1)
+        ax2 = plt.subplot(1, 1, 1)
         ax2.imshow(img)
 
         line_colors = ['.r-', '.g-', '.b-', '.y-']
-        
+
         for index, (cls, obj) in enumerate(objects):
-            current_color = line_colors[index%4]
+            current_color = line_colors[index % 4]
             cad_index = obj['cad_index']
             cad = class_cads[cls][cad_index]
-            
+
             # Overlays CAD Model on Image
             vertices_3d = cad['vertices']
             faces = cad['faces']
             vertices_2d = utils.project_points_3d_to_2d(vertices_3d, **obj['viewpoint'])
             p = self.create_patch_collection_from_vertices(vertices_2d, faces)
             ax2.add_collection(p)
-        
+
             scaled_cube = self._scale_unit_cube(vertices_3d)
 
-            verts = [[scaled_cube[0], scaled_cube[1],scaled_cube[3],scaled_cube[2]], 
+            verts = [[scaled_cube[0], scaled_cube[1], scaled_cube[3], scaled_cube[2]],
                      [scaled_cube[0], scaled_cube[1], scaled_cube[5], scaled_cube[4]],
                      [scaled_cube[4], scaled_cube[5], scaled_cube[7], scaled_cube[6]],
                      [scaled_cube[6], scaled_cube[7], scaled_cube[3], scaled_cube[2]],
                      [scaled_cube[0], scaled_cube[2], scaled_cube[6], scaled_cube[4]],
                      [scaled_cube[1], scaled_cube[3], scaled_cube[7], scaled_cube[5]]
-                    ]    
-            
+                     ]
+
             collection = Poly3DCollection(verts, facecolors='cyan', linewidths=1, edgecolors='r', alpha=.25)
             face_color = [0.5, 0.5, 1]
             collection.set_facecolor(face_color)
-            
-            #Projects 3D points of scaled cube to 2D points on Image
-            cube_2d_projection = utils.project_points_3d_to_2d(scaled_cube, ** obj['viewpoint'])
-            
+
+            # Projects 3D points of scaled cube to 2D points on Image
+            cube_2d_projection = utils.project_points_3d_to_2d(scaled_cube, **obj['viewpoint'])
+
             # Connect Points to Visualize Cube
             # ACROSS
-            ax2.plot(cube_2d_projection[:2,0], cube_2d_projection[:2,1],current_color)
-            ax2.plot(cube_2d_projection[2:4,0], cube_2d_projection[2:4,1],current_color)
-            ax2.plot(cube_2d_projection[4:6,0], cube_2d_projection[4:6,1],current_color)
-            ax2.plot(cube_2d_projection[6:8,0], cube_2d_projection[6:8,1],current_color)
-            #ALONG
-            ax2.plot([cube_2d_projection[1,0],cube_2d_projection[5,0]],
-                     [cube_2d_projection[1,1],cube_2d_projection[5,1]], current_color)
-            ax2.plot([cube_2d_projection[2,0],cube_2d_projection[6,0]],
-                     [cube_2d_projection[2,1],cube_2d_projection[6,1]], current_color)
-            ax2.plot([cube_2d_projection[3,0],cube_2d_projection[7,0]],
-                     [cube_2d_projection[3,1],cube_2d_projection[7,1]], current_color)
-            ax2.plot([cube_2d_projection[0,0],cube_2d_projection[4,0]],
-                     [cube_2d_projection[0,1],cube_2d_projection[4,1]],current_color)
-            
-            #VERTICAL
-            ax2.plot([cube_2d_projection[2,0],cube_2d_projection[0,0]],
-                     [cube_2d_projection[2,1],cube_2d_projection[0,1]],current_color)
-            ax2.plot([cube_2d_projection[3,0],cube_2d_projection[1,0]],
-                     [cube_2d_projection[3,1],cube_2d_projection[1,1]],current_color)
-            ax2.plot([cube_2d_projection[5,0],cube_2d_projection[7,0]],
-                     [cube_2d_projection[5,1],cube_2d_projection[7,1]],current_color)
-            ax2.plot([cube_2d_projection[4,0],cube_2d_projection[6,0]],
-                     [cube_2d_projection[4,1],cube_2d_projection[6,1]], current_color)
-            
+            ax2.plot(cube_2d_projection[:2, 0], cube_2d_projection[:2, 1], current_color)
+            ax2.plot(cube_2d_projection[2:4, 0], cube_2d_projection[2:4, 1], current_color)
+            ax2.plot(cube_2d_projection[4:6, 0], cube_2d_projection[4:6, 1], current_color)
+            ax2.plot(cube_2d_projection[6:8, 0], cube_2d_projection[6:8, 1], current_color)
+            # ALONG
+            ax2.plot([cube_2d_projection[1, 0], cube_2d_projection[5, 0]],
+                     [cube_2d_projection[1, 1], cube_2d_projection[5, 1]], current_color)
+            ax2.plot([cube_2d_projection[2, 0], cube_2d_projection[6, 0]],
+                     [cube_2d_projection[2, 1], cube_2d_projection[6, 1]], current_color)
+            ax2.plot([cube_2d_projection[3, 0], cube_2d_projection[7, 0]],
+                     [cube_2d_projection[3, 1], cube_2d_projection[7, 1]], current_color)
+            ax2.plot([cube_2d_projection[0, 0], cube_2d_projection[4, 0]],
+                     [cube_2d_projection[0, 1], cube_2d_projection[4, 1]], current_color)
+
+            # VERTICAL
+            ax2.plot([cube_2d_projection[2, 0], cube_2d_projection[0, 0]],
+                     [cube_2d_projection[2, 1], cube_2d_projection[0, 1]], current_color)
+            ax2.plot([cube_2d_projection[3, 0], cube_2d_projection[1, 0]],
+                     [cube_2d_projection[3, 1], cube_2d_projection[1, 1]], current_color)
+            ax2.plot([cube_2d_projection[5, 0], cube_2d_projection[7, 0]],
+                     [cube_2d_projection[5, 1], cube_2d_projection[7, 1]], current_color)
+            ax2.plot([cube_2d_projection[4, 0], cube_2d_projection[6, 0]],
+                     [cube_2d_projection[4, 1], cube_2d_projection[6, 1]], current_color)
+
         plt.show()
 
-        
     def apply_transformation(self, cube, transformation_matrix):
         transformed_cube = []
         for vector in cube:
-            new_vector = np.dot(transformation_matrix, np.append(vector,[1]))
+            new_vector = np.dot(transformation_matrix, np.append(vector, [1]))
             transformed_cube.append(new_vector[:3])
 
         return np.array(transformed_cube)
- 
-    
+
     def compute_angle_between_vertices(cube):
-        #Sanity Check Line Angles
-        m1 = (cube[1,1] - cube[0,1])/(cube[1,0] - cube[0, 0])
-        m2 =(cube[4,1] - cube[0,1])/(cube[4,0] - cube[0, 0])
-        return np.arctan((m1 - m2)/(1 + m1*m2))   
-   
+        # Sanity Check Line Angles
+        m1 = (cube[1, 1] - cube[0, 1]) / (cube[1, 0] - cube[0, 0])
+        m2 = (cube[4, 1] - cube[0, 1]) / (cube[4, 0] - cube[0, 0])
+        return np.arctan((m1 - m2) / (1 + m1 * m2))
+
     def show_pcd_overlay(self, i):
         data = self.get_data(i)
         img = data['img']
@@ -1202,7 +1224,7 @@ class Pascal3DDataset(object):
 
         n_classes = len(self.class_names)
         colormap = plt.cm.Spectral(
-            np.linspace(0, 1, n_classes-1))[:, :3]   # w/o background color
+            np.linspace(0, 1, n_classes - 1))[:, :3]  # w/o background color
         colormap = np.vstack(([0, 0, 0], colormap))  # w/ background color
         for cls, obj in objects:
             cls_id = self.class_names.index(cls)
@@ -1305,7 +1327,7 @@ class Pascal3DDataset(object):
             else:
                 subprocess.call(shlex.split(cmd))
             # obj file -> pcd file
-            cmd = 'pcl_mesh2pcd {} {} -no_vis_result -leaf_size 0.0001'\
+            cmd = 'pcl_mesh2pcd {} {} -no_vis_result -leaf_size 0.0001' \
                 .format(obj_file, pcd_file)
             if dry_run:
                 print(cmd)
@@ -1324,7 +1346,7 @@ class Pascal3DDataset(object):
                           .format(pcd_file))
                 continue
             # ply file -> pcd file
-            cmd = 'pcl_mesh_sampling {} {} -no_vis_result -leaf_size 0.0001'\
+            cmd = 'pcl_mesh_sampling {} {} -no_vis_result -leaf_size 0.0001' \
                 .format(obj_file, pcd_file)
             if dry_run:
                 print(cmd)
