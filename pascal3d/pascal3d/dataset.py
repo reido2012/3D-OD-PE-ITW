@@ -516,7 +516,7 @@ class Pascal3DDataset(object):
 
         return [line.rstrip() for line in lines]
 
-    def create_tfrecords(self, debug=False):
+    def create_tfrecords(self, tfrecord_directory, debug=False):
         """
         Create TF.Records file for traning or dataset
         """
@@ -536,7 +536,7 @@ class Pascal3DDataset(object):
         for name, id_list in record_map.items():
             tfrecords_filename = '{}.tfrecords'.format(name)
             print("Starting: {}".format(tfrecords_filename))
-            self._create_tfrecords_from_data_ids(tfrecords_filename, id_list, debug)
+            self._create_tfrecords_from_data_ids(tfrecords_filename, id_list, tfrecord_directory, debug)
             print("Finished: {}".format(tfrecords_filename))
 
     def create_tfrecords_synth_domain(self, path_to_save_records, local):
@@ -710,7 +710,7 @@ class Pascal3DDataset(object):
 
         return np.array([x, y, z])
 
-    def _create_tfrecords_from_data_ids(self, record_name, ids, debug):
+    def _create_tfrecords_from_data_ids(self, record_name, ids, tfrecord_directory, debug):
         """
             Creates TFRecords for a set of ids
             
@@ -718,7 +718,7 @@ class Pascal3DDataset(object):
                 ids: list of data ids        
         """
 
-        writer = tf.python_io.TFRecordWriter("/notebooks/selerio/tf_records_blur_only/" + record_name)
+        writer = tf.python_io.TFRecordWriter(tfrecord_directory + record_name)
         skipped = []
         for data_id in tqdm.tqdm(ids):
 
@@ -784,26 +784,6 @@ class Pascal3DDataset(object):
                 # One TF Record with normal image
                 self._write_record(writer, resized_img, output_vector, False, False, False, cls, data_id, counter)
 
-                # Don't want to augment validation images
-                if record_name != 'pascal_val.tfrecords':
-                    image = resized_img
-                    blur = True if (apply_blur == 1) else False
-
-                    #                     mirror = True
-                    #                     image, output_vector = self._augment_image(image, output_vector, blur=blur, mirror=mirror)
-                    #                     self._write_record(writer, image, output_vector, blur, False, False, cls, data_id, counter)
-
-                    mirror = False
-                    if blur:
-                        image, output_vector = self._augment_image(image, output_vector, blur=blur, mirror=mirror)
-                        self._write_record(writer, image, output_vector, blur, False, mirror, cls, data_id, counter)
-
-        #                     if apply_random_crops:
-        #                         all_random_crops, output_vector = self._create_random_crops(original_img, bbox, virtual_control_points_2d, bbox_3d_dims)
-
-        #                         for random_crop in all_random_crops:
-        #                             self._write_record(writer, random_crop, output_vector, False, True, False, cls, data_id, counter)
-
         writer.close()
 
         if debug:
@@ -824,9 +804,6 @@ class Pascal3DDataset(object):
         feature = {
             'object_image': self._bytes_feature(img_raw),
             'output_vector': self._floats_feature(output_vector),
-            'blurred': self._int64_feature(apply_blur),
-            'mirrored': self._int64_feature(int(mirrored)),
-            'jittered': self._int64_feature(int(jittered)),
             'object_class': self._bytes_feature(object_cls.encode('utf-8')),
             'data_id': self._bytes_feature(data_id.encode('utf-8')),
             'object_index': self._int64_feature(object_index)
