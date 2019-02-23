@@ -41,6 +41,7 @@ IMAGENET_IMAGESET_DIR = DATASET_DIR + "/Image_sets/"
 PASCAL_IMAGESET_DIR = DATASET_DIR + "/PASCAL/VOCdevkit/VOC2012/ImageSets/Main/"
 OBJ_DIR = DATASET_DIR + "/OBJ/"
 
+
 class Pascal3DAnnotation(object):
 
     def __init__(self, ann_file):
@@ -544,11 +545,11 @@ class Pascal3DDataset(object):
         imagenet_train_ids, imagenet_val_ids = self._get_imagenet_ids()
 
         record_map = {
-            # "pascal_train": pascal_train_ids,
-            #             "pascal_test": pascal_test_ids,
-            # "pascal_val": pascal_val_ids,
+            "pascal_train": pascal_train_ids,
+            "pascal_test": pascal_test_ids,
+            "pascal_val": pascal_val_ids,
             "imagenet_train": imagenet_train_ids,
-            # "imagenet_val": imagenet_val_ids
+            "imagenet_val": imagenet_val_ids
         }
 
         for name, id_list in record_map.items():
@@ -574,7 +575,8 @@ class Pascal3DDataset(object):
         writer = tf.python_io.TFRecordWriter(path_to_save_records + record_name)
         skipped = []
         print(len(ids))
-        for data_id in ids:
+
+        for counter, data_id in enumerate(ids):
 
             data = self.get_data(0, data_id=data_id)
             if data['img'] is None:
@@ -582,6 +584,7 @@ class Pascal3DDataset(object):
                 # Annotation Not Find for Data ID
                 skipped.append(str(data_id) + "\n")
                 continue
+
             img = data['img']
 
             if (len(img.shape)) < 3:
@@ -590,23 +593,20 @@ class Pascal3DDataset(object):
                 skipped.append(str(data_id) + "\n")
                 continue
 
-            original_img = img
-            objects = data['objects']
-            class_cads = data['class_cads']
-            #             print(f"Data ID: {data_id}")
+            print("Data ID: ")
+            print(data_id)
 
-            for counter, (cls, obj) in enumerate(objects):
+            for obj_idx, (cls, obj) in enumerate(data['objects']):
                 if obj['skip'] and record_name == 'pascal_val.tfrecords':
                     # We only want to evaluate on non truncated/occluded objects
                     # Skip object if it is truncated
-                    skipped.append("Object: " + str(counter) + " In Image: " + str(data_id) + "\n")
+                    skipped.append("Object: " + str(obj_idx) + " In Image: " + str(data_id) + "\n")
                     continue
 
-                print("Getting Information:")
-                virtual_control_points_2d, bbox_3d_dims = self._get_real_domain_output_vector(cls, class_cads, obj)
                 bbox = obj['bbox']
                 cropped_img, square_bbox = self._crop_object_from_img(img, bbox)
                 resized_img = scipy.misc.imresize(cropped_img, (224, 224))
+                _, bbox_3d_dims = self._get_real_domain_output_vector(cls, data['class_cads'], obj)
                 cad_index = obj['cad_index']
 
                 R, R_rot = utils.get_transformation_matrix(
@@ -614,41 +614,28 @@ class Pascal3DDataset(object):
                     obj['viewpoint']['elevation'],
                     obj['viewpoint']['distance'],
                 )
-                print(f"Rotation Matrix: {R_rot}")
-                rotation_tuple = self._rotation_matrix_to_euler_angles(R_rot)
-                #                 print(f"Rotation Tuple: {rotation_tuple}")
-                print(f"Cad Index: {cad_index}")
-                cad_index = self.get_cad_number(cad_index)
-                print(f"Cad Index: {cad_index}")
 
-                positive_depth_map_image_path = self.render_for_dataset(cls, cad_index, rotation_tuple, data_id, OBJ_DIR, local=local)
+                rotation_tuple = self.mat2euler(R_rot)[::-1]
+                cad_index = self.get_cad_number(cad_index)
+                obj_id = str(obj_idx)
+
+                positive_depth_map_image_path = self.render_for_dataset(cls, cad_index, rotation_tuple, bbox_3d_dims, data_id, obj_id,
+                                                                        OBJ_DIR, local=local)
+
                 print("PD Image Path: " + positive_depth_map_image_path)
-                return
                 positive_depth_image = scipy.misc.imread(positive_depth_map_image_path)
 
-                self._write_synth_record(writer, resized_img, positive_depth_image, rotation_tuple, cad_index, cls,
-                                         data_id)
+                self._write_synth_record(writer, resized_img, positive_depth_image, cad_index, cls,
+                                         data_id, obj_id)
 
-                return
-            return
-        return
-
-    def get_cad_number(self, cad_index):
+    @staticmethod
+    def get_cad_number(cad_index):
         index = int(cad_index) + 1
         return '0' + str(index)
 
-    def render_for_dataset(self, image_class, cad_index, rotation_xyz, record_id, path_to_objs, local=False):
+    def render_for_dataset(self, image_class, cad_index, rotation_xyz, bbox_dims, record_id, obj_id, path_to_objs, local=False):
         x_rotation, y_rotation, z_rotation = rotation_xyz
-
-        # x_rotation = int(round(x_rotation))
-        # y_rotation = int(round(y_rotation))
-        # z_rotation = int(round(z_rotation))
-
-        print(str(x_rotation))
-        print(str(y_rotation))
-        print(str(z_rotation))
-        # render for each object in CAD_OBJ in image_class
-        # return path to depth image and we want - gt_index
+        x_dim, y_dim, z_dim = bbox_dims
 
         for object_path in glob.glob(path_to_objs + image_class + "/*.obj"):
 
@@ -656,20 +643,19 @@ class Pascal3DDataset(object):
 
             command = "nvidia-docker run -v /home/omarreid/selerio/:/workdir peterlauri/blender-python:latest blender " \
                       "-noaudio --background --python /workdir/pix3d/blender_render.py --  --specific_viewpoint True " \
-                      "--cad_index " + curr_obj_cad_index + " --viewpoint=" + str(
+                      "--cad_index " + curr_obj_cad_index + " --obj_id=" + obj_id + " --viewpoint=" + str(
                 x_rotation) + "," + str(y_rotation) + "," + str(
                 z_rotation) + " --output_folder /workdir/pix3d/synth_renderings/" + str(record_id) + " "
 
             if local:
-                command = "/Applications/Blender/blender.app/Contents/MacOS/blender -noaudio --background --python ./blender_render.py -- --specific_viewpoint=True " \
-                          "--cad_index=" + curr_obj_cad_index + " --radians=True --viewpoint=" + str(x_rotation) + "," + str(
+                command = "/Applications/Blender/blender.app/Contents/MacOS/blender -noaudio --background --python " \
+                          "./blender_render.py -- --specific_viewpoint=True --cad_index=" + curr_obj_cad_index + " --obj_id=" + obj_id + " --radians=True --viewpoint=" + str(
+                    x_rotation) + "," + str(
                     y_rotation) + "," + str(
-                    z_rotation) + " --output_folder ./synth_renderings/" + str(record_id) + " "
-
-            print("Object Path: " + object_path)
-            print("Curr CAD INDEX: " + str(curr_obj_cad_index))
-            print("Class: " + str(image_class))
-            print("Command: " + command)
+                    z_rotation) + " --bbox=" + str(
+                    x_dim) + "," + str(
+                    y_dim) + "," + str(
+                    z_dim) + " --output_folder ./synth_renderings/" + str(record_id) + " "
 
             if not local:
                 object_path = "/workdir/" + "/".join(object_path.split("/")[4:])
@@ -677,38 +663,38 @@ class Pascal3DDataset(object):
             full_command = command + object_path
 
             try:
-                process = subprocess.run(full_command.split(), check=True)
+                subprocess.run(full_command.split(), check=True)
             except subprocess.CalledProcessError as e:
                 print(e)
                 raise e
 
-        return "/home/omarreid/selerio/pix3d/synth_renderings/" + str(record_id) + "/" + str(cad_index) + "_0001.png"
+            print("Command: " + full_command)
 
-    def _is_rotation_matrix(self, R):
-        Rt = np.transpose(R)
-        shouldBeIdentity = np.dot(Rt, R)
-        I = np.identity(3, dtype=R.dtype)
-        n = np.linalg.norm(I - shouldBeIdentity)
-        return n < 1e-6
+        return "/home/omarreid/selerio/datasets/synth_renderings/" + str(record_id) + "/" + obj_id + "_" + str(
+            cad_index) + "_0001.png"
 
-    def _rotation_matrix_to_euler_angles(self, R):
+    def mat2euler(self, M, cy_thresh=None):
+        ''' Discover Euler angle vector from 3x3 matrix '''
 
-        assert (self._is_rotation_matrix(R))
-
-        sy = math.sqrt(R[0, 0] * R[0, 0] + R[1, 0] * R[1, 0])
-
-        singular = sy < 1e-6
-
-        if not singular:
-            x = math.atan2(R[2, 1], R[2, 2])
-            y = math.atan2(-R[2, 0], sy)
-            z = math.atan2(R[1, 0], R[0, 0])
-        else:
-            x = math.atan2(-R[1, 2], R[1, 1])
-            y = math.atan2(-R[2, 0], sy)
-            z = 0
-
-        return np.array([x, y, z])
+        M = np.asarray(M)
+        if cy_thresh is None:
+            try:
+                cy_thresh = np.finfo(M.dtype).eps * 4
+            except ValueError:
+                cy_thresh = 1e-6
+        r11, r12, r13, r21, r22, r23, r31, r32, r33 = M.flat
+        # cy: sqrt((cos(y)*cos(z))**2 + (cos(x)*cos(y))**2)
+        cy = math.sqrt(r33 * r33 + r23 * r23)
+        if cy > cy_thresh:  # cos(y) not close to zero, standard form
+            z = math.atan2(-r12, r11)  # atan2(cos(y)*sin(z), cos(y)*cos(z))
+            y = math.atan2(r13, cy)  # atan2(sin(y), cy)
+            x = math.atan2(-r23, r33)  # atan2(cos(y)*sin(x), cos(x)*cos(y))
+        else:  # cos(y) (close to) zero, so x -> 0.0 (see above)
+            # so r21 -> sin(z), r22 -> cos(z) and
+            z = math.atan2(r21, r22)
+            y = math.atan2(r13, cy)  # atan2(sin(y), cy)
+            x = 0.0
+        return z, y, x
 
     def _create_tfrecords_from_data_ids(self, record_name, ids, tfrecord_directory, debug):
         """
@@ -718,7 +704,7 @@ class Pascal3DDataset(object):
                 ids: list of data ids        
         """
 
-        writer = tf.python_io.TFRecordWriter(tfrecord_directory + record_name)
+        writer = tf.python_io.TFRecordWriter(record_name)
         skipped = []
         for data_id in tqdm.tqdm(ids):
 
@@ -736,7 +722,7 @@ class Pascal3DDataset(object):
                 skipped.append(str(data_id) + "\n")
                 continue
 
-            apply_blur, apply_random_crops = self._set_image_operations
+            # apply_blur, apply_random_crops = self._set_image_operations
 
             original_img = img
             objects = data['objects']
@@ -812,8 +798,8 @@ class Pascal3DDataset(object):
         example = tf.train.Example(features=tf.train.Features(feature=feature))
         record_writer.write(example.SerializeToString())
 
-    def _write_synth_record(self, record_writer, image, positive_depth_map_image, rotation_tuple, cad_index,
-                            object_class, uid):
+    def _write_synth_record(self, record_writer, image, positive_depth_map_image, cad_index,
+                            object_class, data_id, object_index):
         img_raw = image.tostring()
         depth_img_raw = positive_depth_map_image.tostring()
 
@@ -821,7 +807,8 @@ class Pascal3DDataset(object):
             'object_image': self._bytes_feature(img_raw),
             'positive_depth_image': self._bytes_feature(depth_img_raw),
             'object_class': self._bytes_feature(object_class.encode('utf-8')),
-            'unique_id': self._bytes_feature(uid.encode('utf-8')),
+            'object_index': self._bytes_feature(object_index.encode('utf-8')),
+            'data_id': self._bytes_feature(data_id.encode('utf-8')),
             'cad_index': self._int64_feature(cad_index)
         }
 
@@ -1181,7 +1168,7 @@ class Pascal3DDataset(object):
 
         return np.array(transformed_cube)
 
-    def compute_angle_between_vertices(cube):
+    def compute_angle_between_vertices(self, cube):
         # Sanity Check Line Angles
         m1 = (cube[1, 1] - cube[0, 1]) / (cube[1, 0] - cube[0, 0])
         m2 = (cube[4, 1] - cube[0, 1]) / (cube[4, 0] - cube[0, 0])

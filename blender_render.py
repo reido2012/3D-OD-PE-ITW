@@ -37,6 +37,7 @@ parser.add_argument('--radians', type=bool, default=False,
 parser.add_argument('--specific_viewpoint', type=bool, default=False,
                     help='True when you want to use to render a single depth map from a particulary viewpoint .')
 parser.add_argument('--viewpoint', help="Tuple of XYZ rotation", dest="rotation_tuple", default=(0,0,0), type=rotation_tuple, nargs='+')
+parser.add_argument('--bbox', help="Tuple of GT BBox Dimensions", dest="bbox_dims", default=(0,0,0), type=rotation_tuple, nargs='+')
 parser.add_argument('--depth_scale', type=float, default=1,
                     help='Scaling that is applied to depth. Depends on size of mesh. Try out various values until you get a good result. Ignored if format is OPEN_EXR.')
 parser.add_argument('--color_depth', type=str, default='8',
@@ -220,6 +221,7 @@ def render_at_viewpoint():
     print(args.rotation_tuple[0])
     # OBJ files are not front facing at first we are correcting for this
     base_tuple = (radians(90), 0, radians(0))
+    bbox_dims = args.bbox_dims[0]
 
     if not args.radians:
         print("Converting from Degrees to Radians")
@@ -238,14 +240,12 @@ def render_at_viewpoint():
 
         new_rotation = tuple(new_rotation)
         print(new_rotation)
-        current_obj.rotation_euler[0] = new_rotation[0]
-        current_obj.rotation_euler[1] = new_rotation[1]
-        current_obj.rotation_euler[2] = new_rotation[2]
-
-        # current_obj.rotation_euler = new_rotation
+        current_obj.rotation_euler = new_rotation
 
     directory_path = args.output_folder
     render_image(directory_path, args.obj_id + "_" + args.cad_index)
+    print(args.bbox_dims[0])
+    print(current_obj.dimensions)
     print(current_obj.rotation_euler)
 
 
