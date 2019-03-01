@@ -5,22 +5,24 @@ import math
 import tensorflow as tf
 import numpy as np
 import click
-from nets import nets_factory
+import scipy.stats as st
+
 from eval_metrics import run_eval
+from keras.applications.resnet50 import ResNet50, preprocess_input
+
 slim = tf.contrib.slim
 tf.logging.set_verbosity(tf.logging.INFO)
 
 
-TFRECORDS_DIR = "/notebooks/selerio/"
+TFRECORDS_DIR = "/home/omarreid/selerio/datasets"
 TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR + "pascal_train.tfrecords",  TFRECORDS_DIR + "imagenet_val.tfrecords"]
 EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
 BATCH_SIZE = 50
 NUM_CPU_CORES = 8
-IMAGE_SIZE = 224 # To match ResNet dimensions 
-RESNET_V1_CHECKPOINT_DIR = "/notebooks/selerio/pre_trained_weights/resnet_v1_50.ckpt"
+IMAGE_SIZE = 224 # To match ResNet dimensions
 GREYSCALE_SIZE = tf.constant(50176)
 GREYSCALE_CHANNEL = tf.constant(1)
-#META PARAMETERS 
+# META PARAMETERS
 ALPHA = 1
 BETA = math.exp(-5)
 GAMMA = math.exp(-3)
@@ -33,46 +35,25 @@ def real_domain_cnn_model_fn(features, labels, mode):
     """
     Real Domain CNN from 3D Object Detection and Pose Estimation paper
     """
-#     with tf.device('/gpu:0'):
-    # Use Feature Extractor to extract the image descriptors from the images
-    #Could use mobilenet for a smaller model
-    network_name = 'resnet_v1_50'
-    
+    # Features are images
+    # Training End to End - So weights start from scratch
+    base_model = ResNet50(include_top=False, weights=None)
     is_training = (mode == tf.estimator.ModeKeys.TRAIN)
-    
-    # Retrieve the function that returns logits and endpoints - ResNet was pretrained on ImageNet
-    network_fn = nets_factory.get_network_fn(network_name, num_classes=None, is_training=is_training)
+    if is_training:
+        # Want to train all the layers
+        for layer in base_model.layers[:]:
+            layer.trainable = True
 
-    # Retrieve the model scope from network factory
-    model_scope = nets_factory.arg_scopes_map[network_name]
-    
-    # Retrieve the (pre) logits and network endpoints (for extracting activations)
-    # Note: endpoints is a dictionary with endpoints[name] = tf.Tensor
+    tf.keras.backend.set_learning_phase(mode == tf.estimator.ModeKeys.TRAIN)
 
     features = tf.identity(features, name="input") # Used when converting to unity
-  
-    image_descriptors, endpoints = network_fn(features)
-#     image_descriptors = tf.layers.batch_normalization(image_descriptors, training=is_training)
-    
-    # Find the checkpoint file
-    checkpoint_path = RESNET_V1_CHECKPOINT_DIR
 
-    if tf.gfile.IsDirectory(checkpoint_path):
-        print("Found Directory")
-        checkpoint_path = tf.train.latest_checkpoint(checkpoint_path)
+    image_descriptors = base_model(features)
+    image_descriptors = tf.identity(image_descriptors, name="image_descriptors")
+    # image_descriptors = tf.layers.dropout(image_descriptors, rate=0.5, training=is_training)
 
-    # Load pre-trained weights into the model
-    variables_to_restore = slim.get_variables_to_restore()
-    restore_fn = slim.assign_from_checkpoint_fn(checkpoint_path, variables_to_restore)
-
-   # Start the session and load the pre-trained weights
-    sess = tf.Session()
-    restore_fn(sess)
-    
-    image_descriptors = tf.layers.dropout(image_descriptors, rate=0.5, training=is_training)
-    #Add a dense layer to get the 19 neuron linear output layer
-    logits = tf.layers.dense(image_descriptors, 19,  kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=0.0001))
-#     logits = tf.Print(logits, [logits], "Pre Squeeeze Logits")
+    # Add a dense layer to get the 19 neuron linear output layer
+    logits = tf.keras.layers.Dense(image_descriptors, 19,  kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=0.0001))
     logits = tf.squeeze(logits, name='2d_predictions')
     
     predictions = {
@@ -111,23 +92,24 @@ def real_domain_cnn_model_fn(features, labels, mode):
         
         return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
 
-
     # Add evaluation metrics (for EVAL mode)
     eval_metric_ops = {
+        'loss': loss
     }
-
-    return tf.estimator.EstimatorSpec(mode=mode, loss=loss, eval_metric_ops=eval_metric_ops)
+    return tf.estimator.EstimatorSpec(mode=mode, loss=loss, predictions=predictions, eval_metric_ops=eval_metric_ops)
 
     
 def pose_loss(labels, logits):
-#     logits = tf.Print(logits, [logits], "Logits")
-    return projection_loss(labels[:, :16], logits[:, :16]) +  dimension_loss(labels[:, 16:], logits[:, 16:]) + BETA * tf.losses.get_regularization_loss()
+    return projection_loss(labels[:, :16], logits[:, :16]) + dimension_loss(labels[:, 16:], logits[:, 16:]) + BETA * tf.losses.get_regularization_loss()
+
 
 def projection_loss(bbox_labels, logits_bbox):
     return tf.losses.huber_loss(bbox_labels, logits_bbox, delta=HUBER_LOSS_DELTA)
 
+
 def dimension_loss(dimension_labels, dimension_logits):
     return tf.losses.huber_loss(dimension_labels, dimension_logits, delta=HUBER_LOSS_DELTA)
+
 
 def dataset_base(dataset, shuffle=True):
     if shuffle:
@@ -150,20 +132,12 @@ def train_input_fn():
     features, labels = iterator.get_next()
     return features, labels
 
-def predict_input_fn():
-    dataset = tf.data.TFRecordDataset(EVAL_TEST_TFRECORDS)
-    dataset = dataset_base(dataset, shuffle=False)
-    dataset = dataset.repeat(count=1)
-    
-    iterator = dataset.make_one_shot_iterator()
-    features, labels = iterator.get_next()
-    return features, labels
 
 def eval_input_fn():
     """
     Builds an input pipeline that yields batches of feature and label pairs for evaluation 
     """
-    dataset = tf.data.TFRecordDataset(EVAL_TFRECORDS).repeat(count=1)
+    dataset = tf.data.TFRecordDataset(EVAL_TFRECORDS)
     dataset = dataset_base(dataset, shuffle=False)
     
     iterator = dataset.make_one_shot_iterator()
@@ -185,12 +159,11 @@ def tfrecord_parser(serialized_example):
         }
     )
 
-    #TODO: Do the random stuff
     # Convert Scalar String to uint8
     input_image = tf.decode_raw(features['object_image'], tf.uint8)
     input_image = tf.to_float(input_image)
     
-    #Image is not in correct shape so 
+    #Image is not in correct shape so fix it
     shape_pred = tf.cast(tf.equal(tf.size(input_image), GREYSCALE_SIZE), tf.bool)
     image_shape = tf.cond(shape_pred, lambda: tf.stack([IMAGE_SIZE, IMAGE_SIZE, 1]), 
                           lambda: tf.stack([IMAGE_SIZE, IMAGE_SIZE, 3]))
@@ -203,8 +176,51 @@ def tfrecord_parser(serialized_example):
     
     output_vector = tf.cast(features['output_vector'], tf.float32)
 
+    # blur_predicate = tf.math.greater(tf.random_uniform([1], 0, 1, dtype=tf.float32),  0.5)
+    # input_image = tf.cond(blur_predicate, lambda: blur_image(input_image), lambda: input_image)
 
     return input_image, output_vector
+
+
+def blur_image(input_image):
+    random_size, random_sigma = get_random_gauss_atr()
+    return conv(input_image, random_size, random_sigma)
+
+
+def conv(input_image, filter_size, sigma, padding='SAME'):
+    # Get the number of channels in the input
+    c_i = input_image.get_shape().as_list()[3]
+    # Convolution for a given input and kernel
+    kernel = make_gauss_var('gauss_weight', filter_size, sigma, c_i)
+    output = tf.nn.depthwise_conv2d(input_image, kernel, [1, 1, 1, 1], padding=padding)
+    return output
+
+def get_random_gauss_atr():
+    random_size = tf.random.uniform([1], 3, 21, dtype=tf.int64)
+    random_sigma = tf.random.uniform([1], 0, 4, dtype=tf.float32)
+    return random_size, random_sigma
+
+
+def gauss_kernel(kernlen=21, nsig=3, channels=1):
+    interval = (2*nsig+1.)/(kernlen)
+    x = np.linspace(-nsig-interval/2., nsig+interval/2., kernlen+1)
+    kern1d = np.diff(st.norm.cdf(x))
+    kernel_raw = np.sqrt(np.outer(kern1d, kern1d))
+    kernel = kernel_raw/kernel_raw.sum()
+    out_filter = np.array(kernel, dtype = np.float32)
+    out_filter = out_filter.reshape((kernlen, kernlen, 1, 1))
+    out_filter = np.repeat(out_filter, channels, axis = 2)
+    return out_filter
+
+
+def make_gauss_var(name, size, sigma, c_i):
+    kernel = gauss_kernel(size, sigma, c_i)
+    var = tf.Variable(tf.convert_to_tensor(kernel), name=name)
+    return var
+
+
+
+
 @click.command()
 @click.option('--model_dir', default="/notebooks/selerio/pose_estimation_models/the_one_eight", help='Path to model to evaluate')       
 def main(model_dir):
@@ -217,18 +233,15 @@ def main(model_dir):
             model_dir=model_dir
         )
 
-        # Set up logging for predictions
-        # Log the values in the "Softmax" tensor with label "probabilities"
         tensors_to_log = {"logits": "2d_predictions", "learning_rate": "learning_rate",}
         logging_hook = tf.train.LoggingTensorHook(tensors=tensors_to_log, every_n_iter=100)
 
-        real_domain_cnn.train(
-          input_fn=train_input_fn,
-          hooks=[logging_hook]
-        )
-            
+        train_spec = tf.estimator.TrainSpec(input_fn=train_input_fn, hooks=[logging_hook], max_steps=30000)
+        eval_spec = tf.estimator.EvalSpec(input_fn=eval_input_fn)
+
+        tf.estimator.train_and_evaluate(real_domain_cnn, train_spec, eval_spec)
+
         acc_pi_6, med_error = run_eval(model_dir)
-#         epochs_elapsed = np.sum(counts[:(x+1)])
         logging.debug("ACC PI/6: " + acc_pi_6 + " | Med Error: " + str(med_error) + " | Epochs Elapsed: " + str(40))
 
 
