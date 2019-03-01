@@ -14,7 +14,7 @@ slim = tf.contrib.slim
 tf.logging.set_verbosity(tf.logging.INFO)
 
 
-TFRECORDS_DIR = "/home/omarreid/selerio/datasets"
+TFRECORDS_DIR = "/home/omarreid/selerio/datasets/"
 TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR + "pascal_train.tfrecords",  TFRECORDS_DIR + "imagenet_val.tfrecords"]
 EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
 BATCH_SIZE = 50
