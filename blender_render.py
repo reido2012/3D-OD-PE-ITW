@@ -56,6 +56,7 @@ tree = bpy.context.scene.node_tree
 links = tree.links
 
 bpy.context.scene.render.engine = 'CYCLES'
+
 # Add passes for additionally dumping albedo and normals.
 bpy.context.scene.render.layers["RenderLayer"].use_pass_normal = True
 bpy.context.scene.render.layers["RenderLayer"].use_pass_color = True
@@ -65,6 +66,13 @@ bpy.context.scene.render.image_settings.color_depth = args.color_depth
 # Clear default nodes
 for n in tree.nodes:
     tree.nodes.remove(n)
+
+# Setup GPU Stuff
+for scene in bpy.data.scenes:
+    scene.cycles.device = 'GPU'
+
+bpy.context.scene.cycles.device = 'GPU'
+bpy.ops.render.render(True)
 
 # Create input render layer node.
 render_layers = tree.nodes.new('CompositorNodeRLayers')
@@ -84,7 +92,7 @@ else:
     map.use_max = True
     map.max = [1]
 
-    links.new(render_layers.outputs['Depth'], map.inputs[0])
+    links.new(render_layers.outputs['Z'], map.inputs[0])
     links.new(map.outputs[0], depth_file_output.inputs[0])
     
     # New
@@ -141,8 +149,8 @@ def parent_obj_to_camera(b_camera):
 
 rotation_mode = 'XYZ'
 scene = bpy.context.scene
-scene.render.resolution_x = 700
-scene.render.resolution_y = 700
+scene.render.resolution_x = 224
+scene.render.resolution_y = 224
 scene.render.resolution_percentage = 100
 scene.render.alpha_mode = 'TRANSPARENT'
 cam = scene.objects['Camera']
@@ -229,7 +237,6 @@ def render_at_viewpoint():
 
         for counter, angle in enumerate(args.rotation_tuple[0]):
             actual_rotation_tuple.append(radians(angle) + base_tuple[counter])
-        print(actual_rotation_tuple)
 
         current_obj.rotation_euler = tuple(actual_rotation_tuple)
     else:
@@ -239,14 +246,10 @@ def render_at_viewpoint():
             new_rotation.append((angle) + base_tuple[counter])
 
         new_rotation = tuple(new_rotation)
-        print(new_rotation)
         current_obj.rotation_euler = new_rotation
 
     directory_path = args.output_folder
     render_image(directory_path, args.obj_id + "_" + args.cad_index)
-    print(args.bbox_dims[0])
-    print(current_obj.dimensions)
-    print(current_obj.rotation_euler)
 
 
 if args.specific_viewpoint:

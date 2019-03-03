@@ -1,6 +1,5 @@
 # Imports
 import logging
-logging.basicConfig(format = '%(asctime)s %(message)s', datefmt = '%m/%d/%Y %I:%M:%S %p', filename = '/notebooks/selerio/logs/the_one_seven.log', level=logging.DEBUG)
 import math
 import tensorflow as tf
 import numpy as np
@@ -8,16 +7,16 @@ import click
 import scipy.stats as st
 
 from eval_metrics import run_eval
-from keras.applications.resnet50 import ResNet50, preprocess_input
+#from tf.keras.applications.resnet50 import ResNet50, preprocess_input
 
 slim = tf.contrib.slim
 tf.logging.set_verbosity(tf.logging.INFO)
 
 
-TFRECORDS_DIR = "/home/omarreid/selerio/datasets/"
-TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR + "pascal_train.tfrecords",  TFRECORDS_DIR + "imagenet_val.tfrecords"]
+TFRECORDS_DIR = "/home/omarreid/selerio/datasets/real_domain_tfrecords/"
+TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords",  TFRECORDS_DIR + "pascal_train.tfrecords", TFRECORDS_DIR + "imagenet_val.tfrecords"]
 EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
-BATCH_SIZE = 50
+BATCH_SIZE = 30
 NUM_CPU_CORES = 8
 IMAGE_SIZE = 224 # To match ResNet dimensions
 GREYSCALE_SIZE = tf.constant(50176)
@@ -37,7 +36,7 @@ def real_domain_cnn_model_fn(features, labels, mode):
     """
     # Features are images
     # Training End to End - So weights start from scratch
-    base_model = ResNet50(include_top=False, weights=None)
+    base_model = tf.keras.applications.resnet50.ResNet50(include_top=False, weights=None)
     is_training = (mode == tf.estimator.ModeKeys.TRAIN)
     if is_training:
         # Want to train all the layers
@@ -47,13 +46,14 @@ def real_domain_cnn_model_fn(features, labels, mode):
     tf.keras.backend.set_learning_phase(mode == tf.estimator.ModeKeys.TRAIN)
 
     features = tf.identity(features, name="input") # Used when converting to unity
-
+    
+    #features = tf.keras.applications.resnet50.preprocess_input(features)
     image_descriptors = base_model(features)
     image_descriptors = tf.identity(image_descriptors, name="image_descriptors")
     # image_descriptors = tf.layers.dropout(image_descriptors, rate=0.5, training=is_training)
 
     # Add a dense layer to get the 19 neuron linear output layer
-    logits = tf.keras.layers.Dense(image_descriptors, 19,  kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=0.0001))
+    logits = tf.layers.dense(image_descriptors, 19, kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=0.0001))
     logits = tf.squeeze(logits, name='2d_predictions')
     
     predictions = {
@@ -74,7 +74,7 @@ def real_domain_cnn_model_fn(features, labels, mode):
         learning_rate = tf.train.exponential_decay(
             learning_rate=STARTING_LR, 
             global_step=global_step, 
-            decay_steps=23206,
+            decay_steps=28619,
             decay_rate=0.1,
             staircase=True,
             name="learning_rate"
@@ -93,10 +93,10 @@ def real_domain_cnn_model_fn(features, labels, mode):
         return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
 
     # Add evaluation metrics (for EVAL mode)
-    eval_metric_ops = {
-        'loss': loss
-    }
-    return tf.estimator.EstimatorSpec(mode=mode, loss=loss, predictions=predictions, eval_metric_ops=eval_metric_ops)
+    if mode == tf.estimator.ModeKeys.EVAL:
+        eval_metric_ops = {
+        }
+        return tf.estimator.EstimatorSpec(mode=mode, loss=loss, predictions=predictions, eval_metric_ops=eval_metric_ops)
 
     
 def pose_loss(labels, logits):
@@ -113,12 +113,12 @@ def dimension_loss(dimension_labels, dimension_logits):
 
 def dataset_base(dataset, shuffle=True):
     if shuffle:
-        dataset = dataset.shuffle(buffer_size=26206)
+        dataset = dataset.shuffle(buffer_size=28619)
     
     dataset = dataset.map(map_func=tfrecord_parser, num_parallel_calls=NUM_CPU_CORES) #Parallelize data transformation
     dataset.apply(tf.contrib.data.ignore_errors())
     dataset = dataset.batch(batch_size=BATCH_SIZE)
-    return dataset.prefetch(buffer_size=4)
+    return dataset.prefetch(buffer_size=2)
 
 def train_input_fn():
     """
@@ -126,7 +126,7 @@ def train_input_fn():
     """
     dataset = tf.data.TFRecordDataset(TRAINING_TFRECORDS)
     dataset = dataset_base(dataset)
-    dataset = dataset.repeat(count=10) #Train for count epochs
+    dataset = dataset.repeat(count=50) #Train for count epochs
     
     iterator = dataset.make_one_shot_iterator()
     features, labels = iterator.get_next()
@@ -222,11 +222,11 @@ def make_gauss_var(name, size, sigma, c_i):
 
 
 @click.command()
-@click.option('--model_dir', default="/notebooks/selerio/pose_estimation_models/the_one_eight", help='Path to model to evaluate')       
+@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/models/model_two", help='Path to model to evaluate')       
 def main(model_dir):
     #Create your own input function - https://www.tensorflow.org/guide/custom_estimators
     #To handle all of our TF Records
-    with tf.device("/job:localhost/replica:0/task:0/device:GPU:0"):
+    with tf.device("/device:GPU:0"):
         # Create the Estimator
         real_domain_cnn = tf.estimator.Estimator(
             model_fn=real_domain_cnn_model_fn, 
@@ -236,13 +236,13 @@ def main(model_dir):
         tensors_to_log = {"logits": "2d_predictions", "learning_rate": "learning_rate",}
         logging_hook = tf.train.LoggingTensorHook(tensors=tensors_to_log, every_n_iter=100)
 
-        train_spec = tf.estimator.TrainSpec(input_fn=train_input_fn, hooks=[logging_hook], max_steps=30000)
+        train_spec = tf.estimator.TrainSpec(input_fn=train_input_fn, hooks=[logging_hook])
         eval_spec = tf.estimator.EvalSpec(input_fn=eval_input_fn)
 
         tf.estimator.train_and_evaluate(real_domain_cnn, train_spec, eval_spec)
 
-        acc_pi_6, med_error = run_eval(model_dir)
-        logging.debug("ACC PI/6: " + acc_pi_6 + " | Med Error: " + str(med_error) + " | Epochs Elapsed: " + str(40))
+        #acc_pi_6, med_error = run_eval(model_dir)
+        #logging.debug("ACC PI/6: " + acc_pi_6 + " | Med Error: " + str(med_error) + " | Epochs Elapsed: " + str(40))
 
 
 

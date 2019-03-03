@@ -35,7 +35,6 @@ def tfrecord_parser(serialized_example):
             'output_vector': tf.FixedLenFeature([19], tf.float32),
             'data_id': tf.FixedLenFeature([], tf.string),
             'object_index': tf.FixedLenFeature([], tf.int64),
-            'mirrored': tf.FixedLenFeature([], tf.int64)
         }
     )
 
@@ -58,15 +57,7 @@ def tfrecord_parser(serialized_example):
 
     output_vector = tf.cast(features['output_vector'], tf.float32)
     
-    model_input = {
-        "img": input_image, 
-        "object_index": tf.cast(features['object_index'], tf.int32),
-        "data_id": data_id,
-        "ground_truth_output": output_vector,
-        "mirrored": mirrored
-    }
-    
-    return model_input, output_vector
+    return input_image, output_vector
 
 def train_input_fn(tfrecords):
     """
@@ -80,7 +71,7 @@ def train_input_fn(tfrecords):
     return features, labels
 
 def predict_input_fn(tfrecords):
-    dataset = tf.data.TFRecordDataset(tfrecords).repeat(count=1)
+    dataset = tf.data.TFRecordDataset(tfrecords)
     dataset = dataset_base(dataset, shuffle=False)
 
     iterator = dataset.make_one_shot_iterator()

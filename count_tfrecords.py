@@ -5,10 +5,10 @@ import skimage.io as io
 import tensorflow as tf
 
 reconstructed_records = []
-record_iterator_train1 = list(tf.python_io.tf_record_iterator(path="/notebooks/selerio/imagenet_train.tfrecords"))
-record_iterator_train2 = list(tf.python_io.tf_record_iterator(path="/notebooks/selerio/pascal_train.tfrecords"))
-# record_iterator_train3 = list(tf.python_io.tf_record_iterator(path="/notebooks/selerio/imagenet_val.tfrecords"))
-all_iterators=record_iterator_train1+record_iterator_train2#+record_iterator_train3
+record_iterator_train1 = list(tf.python_io.tf_record_iterator(path="/home/omarreid/selerio/datasets/real_domain_tfrecords/imagenet_train.tfrecords"))
+record_iterator_train2 = list(tf.python_io.tf_record_iterator(path="/home/omarreid/selerio/datasets/real_domain_tfrecords/pascal_train.tfrecords"))
+record_iterator_train3 = list(tf.python_io.tf_record_iterator(path="/home/omarreid/selerio/datasets/real_domain_tfrecords/imagenet_val.tfrecords"))
+all_iterators=record_iterator_train1+record_iterator_train2 +record_iterator_train3
 print(len(all_iterators))
 """
 for string_record in all_iterators:

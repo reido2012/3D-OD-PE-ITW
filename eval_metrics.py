@@ -18,6 +18,7 @@ from pascal3d import utils
 from itertools import product
 from model_dataset_utils import predict_input_fn, dataset_base
 from check_tfrecords import line_boxes
+from real_domain_cnn import real_domain_cnn_model_fn
 
 slim = tf.contrib.slim
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -25,17 +26,16 @@ tf.logging.set_verbosity(tf.logging.INFO)
 UNIT_CUBE = np.array(list(product([-0.5, 0.5], [-0.5, 0.5], [-0.5, 0.5])), dtype=np.float32)
 data_type = 'all'
 DATASET = pascal3d.dataset.Pascal3DDataset(data_type, generate=False)
-TFRECORDS_DIR = "/notebooks/selerio/"
+TFRECORDS_DIR = "/home/omarreid/selerio/datasets/real_domain_tfrecords/"
 EVAL_TFRECORDS = TFRECORDS_DIR + "pascal_val.tfrecords"
-RESNET_V1_CHECKPOINT_DIR = "/notebooks/selerio/pre_trained_weights/resnet_v1_50.ckpt"
 
 @click.command()
-@click.option('--model_dir', default="/notebooks/selerio/pose_estimation_models/the_one_five", help='Path to model to evaluate')
+@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/models/test_two", help='Path to model to evaluate')
 @click.option('--tfrecords_file', default=EVAL_TFRECORDS, help='Path to TFRecords file to evaluate model on', type=str)
 @click.option('--generate_imgs', default=False, help='If true will plot model results 10 images and save them ')
 def main(model_dir, tfrecords_file, generate_imgs):
     tfrecords_file=str(tfrecords_file)
-    get_viewpoint_errors(model_dir, real_domain_cnn_model_fn_predict, tfrecords_file, generate_imgs)
+    get_viewpoint_errors(model_dir, real_domain_cnn_model, tfrecords_file, generate_imgs)
 
 def run_eval(model_dir):
     return get_viewpoint_errors(model_dir, real_domain_cnn_model_fn_predict, EVAL_TFRECORDS, False)
@@ -65,7 +65,7 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
         all_model_predictions = real_domain_cnn.predict(input_fn=lambda : predict_input_fn(tfrecords_file), yield_single_examples=False)
         
         #If yielding single examples uncomment the line below - do this if you have a tensor/batch error (slower)
-        all_model_predictions = get_single_examples_from_batch(all_model_predictions)
+        #all_model_predictions = get_single_examples_from_batch(all_model_predictions)
         
         for counter, model_prediction in enumerate(all_model_predictions):
             print(counter)
@@ -204,8 +204,7 @@ def get_predicted_3d_pose(output_vector, focal, ground_truth_output):
     print(predicted_dims)
 
     scaled_unit_cube = compute_scaled_unit_cube(predicted_dims).astype(np.float32)
-#         print("UNIT CUBE")
-#     print(UNIT_CUBE)
+    
     # Camera internals
     skew = 0
     aspect_ratio = 1
@@ -273,57 +272,6 @@ def apply_transformation(cube, transformation_matrix):
         transformed_cube.append(new_vector[:3])
 
     return np.array(transformed_cube)
-
-def real_domain_cnn_model_fn_predict(
-    features, labels, mode):
-    #Real Domain CNN from 3D Object Detection and Pose Estimation paper
-
-    with tf.device('/cpu:0'):
-        # Use Feature Extractor to extract the image descriptors from the images
-        #Could use mobilenet for a smaller model
-        network_name = 'resnet_v1_50'
-
-        # Retrieve the function that returns logits and endpoints - ResNet was pretrained on ImageNet
-        network_fn = nets_factory.get_network_fn(network_name, num_classes=None, is_training=True)
-
-        # Retrieve the model scope from network factory
-        model_scope = nets_factory.arg_scopes_map[network_name]
-
-        # Retrieve the (pre) logits and network endpoints (for extracting activations)
-        # Note: endpoints is a dictionary with endpoints[name] = tf.Tensor
-        image_descriptors, endpoints = network_fn(features['img'])
-
-        # Find the checkpoint file
-        checkpoint_path =RESNET_V1_CHECKPOINT_DIR #"/notebooks/selerio/pose_estimation_models/the_one" 
-
-        if tf.gfile.IsDirectory(checkpoint_path):
-            print("Found Directory")
-            checkpoint_path = tf.train.latest_checkpoint(checkpoint_path)
-
-        # Load pre-trained weights into the model
-        variables_to_restore = slim.get_variables_to_restore()
-        restore_fn = slim.assign_from_checkpoint_fn(checkpoint_path, variables_to_restore)
-
-       # Start the session and load the pre-trained weights
-        sess = tf.Session()
-        restore_fn(sess)
-
-
-        #Add a dense layer to get the 19 neuron linear output layer
-        logits = tf.layers.dense(image_descriptors, 19,  kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=0.0))
-        logits = tf.squeeze(logits, name='2d_predictions')
-
-        predictions = {
-            # Generate predictions (for PREDICT and EVAL mode)
-            "2d_prediction": logits,
-            "data_id": features['data_id'], 
-            "object_index": features['object_index'],
-            "output_vector": features['ground_truth_output'],
-            "img":features['img']
-        }
-
-        if mode == tf.estimator.ModeKeys.PREDICT:
-            return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
 
 
 if __name__ == "__main__":

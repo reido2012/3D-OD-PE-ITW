@@ -36,7 +36,7 @@ from pascal3d import utils
 # UNIT_CUBE = np.array([[-0.5,0.5,-0.5],[-0.5,0.5,0.5], [-0.5, -0.5, -0.5], [-0.5, -0.5, 0.5], [0.5, 0.5, -0.5], [0.5, 0.5, 0.5], [0.5, -0.5, 0.5], [0.5, -0.5,0.5]])
 # UNIT_CUBE = np.array(list(product([-1, 1], [-1, 1], [-1, 1])))
 UNIT_CUBE = np.array(list(product([-0.5, 0.5], [-0.5, 0.5], [-0.5, 0.5])))
-DATASET_DIR = osp.expanduser('/Users/omarreid/Documents/2D23D/PASCAL3D+_release1.1')
+DATASET_DIR = osp.expanduser('/home/omarreid/selerio/datasets/PASCAL3D+_release1.1')
 IMAGENET_IMAGESET_DIR = DATASET_DIR + "/Image_sets/"
 PASCAL_IMAGESET_DIR = DATASET_DIR + "/PASCAL/VOCdevkit/VOC2012/ImageSets/Main/"
 OBJ_DIR = DATASET_DIR + "/OBJ/"
@@ -527,11 +527,11 @@ class Pascal3DDataset(object):
         imagenet_train_ids, imagenet_val_ids = self._get_imagenet_ids()
 
         record_map = {
-            "pascal_train": pascal_train_ids,
+            #"pascal_train": pascal_train_ids,
             #             "pascal_test": pascal_test_ids,
-            #             "pascal_val": pascal_val_ids,
-            "imagenet_train": imagenet_train_ids,
-            "imagenet_val": imagenet_val_ids
+            "pascal_val": pascal_val_ids,
+            #"imagenet_train": imagenet_train_ids,
+            #"imagenet_val": imagenet_val_ids
         }
 
         for name, id_list in record_map.items():
@@ -545,10 +545,10 @@ class Pascal3DDataset(object):
         imagenet_train_ids, imagenet_val_ids = self._get_imagenet_ids()
 
         record_map = {
-            "pascal_train": pascal_train_ids,
-            "pascal_test": pascal_test_ids,
-            "pascal_val": pascal_val_ids,
-            "imagenet_train": imagenet_train_ids,
+            #"pascal_train": pascal_train_ids,
+            #"pascal_test": pascal_test_ids,
+            #"pascal_val": pascal_val_ids,
+            #"imagenet_train": imagenet_train_ids,
             "imagenet_val": imagenet_val_ids
         }
 
@@ -557,7 +557,6 @@ class Pascal3DDataset(object):
             print("Starting: {}".format(tfrecords_filename))
             self._create_synth_tfrecords_from_data_ids(tfrecords_filename, id_list, path_to_save_records, local)
             print("Finished: {}".format(tfrecords_filename))
-            return
 
     def _set_image_operations(self, img):
         height, width, _ = img.shape
@@ -603,11 +602,17 @@ class Pascal3DDataset(object):
                     skipped.append("Object: " + str(obj_idx) + " In Image: " + str(data_id) + "\n")
                     continue
 
+                cad_index = obj['cad_index']
                 bbox = obj['bbox']
+                obj_id = str(obj_idx)
+
+                #if os.path.isfile("/home/omarreid/selerio/datasets/synth_renderings/" + str(data_id) + "/" + obj_id + "_" + str(
+                #cad_index) + "_0001.png"):
+                    #continue
+                
                 cropped_img, square_bbox = self._crop_object_from_img(img, bbox)
                 resized_img = scipy.misc.imresize(cropped_img, (224, 224))
                 _, bbox_3d_dims = self._get_real_domain_output_vector(cls, data['class_cads'], obj)
-                cad_index = obj['cad_index']
 
                 R, R_rot = utils.get_transformation_matrix(
                     obj['viewpoint']['azimuth'],
@@ -617,7 +622,6 @@ class Pascal3DDataset(object):
 
                 rotation_tuple = self.mat2euler(R_rot)[::-1]
                 cad_index = self.get_cad_number(cad_index)
-                obj_id = str(obj_idx)
 
                 positive_depth_map_image_path = self.render_for_dataset(cls, cad_index, rotation_tuple, bbox_3d_dims, data_id, obj_id,
                                                                         OBJ_DIR, local=local)
@@ -627,11 +631,15 @@ class Pascal3DDataset(object):
 
                 self._write_synth_record(writer, resized_img, positive_depth_image, cad_index, cls,
                                          data_id, obj_id)
+        writer.close()
 
     @staticmethod
     def get_cad_number(cad_index):
         index = int(cad_index) + 1
-        return '0' + str(index)
+        if cad_index < 9:
+            return '0' + str(index)
+        else:
+            return str(index)
 
     def render_for_dataset(self, image_class, cad_index, rotation_xyz, bbox_dims, record_id, obj_id, path_to_objs, local=False):
         x_rotation, y_rotation, z_rotation = rotation_xyz
@@ -640,6 +648,9 @@ class Pascal3DDataset(object):
         for object_path in glob.glob(path_to_objs + image_class + "/*.obj"):
 
             curr_obj_cad_index = object_path.split("/")[-1].split(".")[0]
+             
+            if os.path.isfile("/home/omarreid/selerio/datasets/synth_renderings/" + str(record_id) + "/" + obj_id + "_" + str(curr_obj_cad_index) + "_0001.png"):
+                continue
 
             command = "nvidia-docker run -v /home/omarreid/selerio/:/workdir peterlauri/blender-python:latest blender " \
                       "-noaudio --background --python /workdir/pix3d/blender_render.py --  --specific_viewpoint True " \
@@ -648,14 +659,13 @@ class Pascal3DDataset(object):
                 z_rotation) + " --output_folder /workdir/pix3d/synth_renderings/" + str(record_id) + " "
 
             if local:
-                command = "/Applications/Blender/blender.app/Contents/MacOS/blender -noaudio --background --python " \
-                          "./blender_render.py -- --specific_viewpoint=True --cad_index=" + curr_obj_cad_index + " --obj_id=" + obj_id + " --radians=True --viewpoint=" + str(
+                command = "blender -noaudio --background --python ./blender_render.py -- --specific_viewpoint=True --cad_index=" + curr_obj_cad_index + " --obj_id=" + obj_id + " --radians=True --viewpoint=" + str(
                     x_rotation) + "," + str(
                     y_rotation) + "," + str(
                     z_rotation) + " --bbox=" + str(
                     x_dim) + "," + str(
                     y_dim) + "," + str(
-                    z_dim) + " --output_folder ./synth_renderings/" + str(record_id) + " "
+                    z_dim) + " --output_folder /home/omarreid/selerio/datasets/synth_renderings/" + str(record_id) + " "
 
             if not local:
                 object_path = "/workdir/" + "/".join(object_path.split("/")[4:])
@@ -809,7 +819,7 @@ class Pascal3DDataset(object):
             'object_class': self._bytes_feature(object_class.encode('utf-8')),
             'object_index': self._bytes_feature(object_index.encode('utf-8')),
             'data_id': self._bytes_feature(data_id.encode('utf-8')),
-            'cad_index': self._int64_feature(cad_index)
+            'cad_index': self._bytes_feature(cad_index.encode('utf-8'))
         }
 
         example = tf.train.Example(features=tf.train.Features(feature=feature))
