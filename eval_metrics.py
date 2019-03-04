@@ -18,24 +18,23 @@ from pascal3d import utils
 from itertools import product
 from model_dataset_utils import dataset_base
 from check_tfrecords import line_boxes
-from real_domain_cnn import real_domain_cnn_model_fn
 
 slim = tf.contrib.slim
 tf.logging.set_verbosity(tf.logging.INFO)
 
 UNIT_CUBE = np.array(list(product([-0.5, 0.5], [-0.5, 0.5], [-0.5, 0.5])), dtype=np.float32)
 data_type = 'all'
-DATASET = pascal3d.dataset.Pascal3DDataset(data_type, generate=False)
+DATASET = pascal3d.dataset.Pascal3DDataset(data_type, dataset_path="/home/omarreid/selerio/datasets/PASCAL3D+_release1.1", generate=True)
 TFRECORDS_DIR = "/home/omarreid/selerio/datasets/real_domain_tfrecords/"
 EVAL_TFRECORDS = TFRECORDS_DIR + "pascal_val.tfrecords"
 
 @click.command()
-@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/models/test_two", help='Path to model to evaluate')
+@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/models/test_five", help='Path to model to evaluate')
 @click.option('--tfrecords_file', default=EVAL_TFRECORDS, help='Path to TFRecords file to evaluate model on', type=str)
 @click.option('--generate_imgs', default=False, help='If true will plot model results 10 images and save them ')
 def main(model_dir, tfrecords_file, generate_imgs):
     tfrecords_file=str(tfrecords_file)
-    get_viewpoint_errors(model_dir, real_domain_cnn_model_fn, tfrecords_file, generate_imgs)
+    get_viewpoint_errors(model_dir, real_domain_cnn_model_fn_predict, tfrecords_file, generate_imgs)
 
 
 def run_eval(model_dir):
@@ -65,12 +64,11 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
         all_differences= []
         
         #yield single examples = False useful if model_fn returns some tensors whose first dimension is not equal to the batch size.
-        all_model_predictions = real_domain_cnn.predict(input_fn=lambda : predict_input_fn(tfrecords_file), yield_single_examples=False)
+        all_model_predictions = real_domain_cnn.predict(input_fn=lambda : predict_input_fn(tfrecords_file), yield_single_examples=True)
         #If yielding single examples uncomment the line below - do this if you have a tensor/batch error (slower)
         #all_model_predictions = get_single_examples_from_batch(all_model_predictions)
         
         for counter, model_prediction in enumerate(all_model_predictions):
-            print(model_prediction)                
             model_output = model_prediction["2d_prediction"]
             image = np.uint8(model_prediction["img"])
             data_id = model_prediction["data_id"].decode('utf-8')
@@ -80,7 +78,7 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
             print(data_id)
             print(object_index)
             
-            ground_truth_rotation_matrix, focal, viewpoint_obj = get_ground_truth_rotation_matrix(data_id, object_index, mirrored)
+            ground_truth_rotation_matrix, focal, viewpoint_obj = get_ground_truth_rotation_matrix(data_id, object_index)
             pred_rotation_matrix, reprojected_virtual_control_points = get_predicted_3d_pose(model_output, focal, ground_truth_output)
              
             print("Ground Truth Rotation Matrix")
@@ -244,9 +242,9 @@ def get_ground_truth_rotation_matrix(data_id, object_index):
     elevation = obj['viewpoint']['elevation']
     focal  = obj['viewpoint']['focal']
     
-    if mirrored:
+    #if mirrored:
         #Flip azimuth angle
-        azimuth = 2*math.pi - azimuth
+       # azimuth = 2*math.pi - azimuth
         
     R, R_rot = utils.get_transformation_matrix(azimuth, elevation, distance)
     
@@ -278,26 +276,21 @@ def real_domain_cnn_model_fn_predict(features, labels, mode):
     """
     Real Domain CNN from 3D Object Detection and Pose Estimation paper
     """
-    # Features are images
-    model_input = features
     # Training End to End - So weights start from scratch
-    base_model = tf.keras.applications.resnet50.ResNet50(include_top=False, weights='imagenet')
+    base_model = tf.keras.applications.resnet50.ResNet50(include_top=False, weights='/home/omarreid/selerio/final_year_project/models/test_five/model.ckpt')
     is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
     if is_training:
         # Want to train all the layers
         for layer in base_model.layers[:]:
             layer.trainable = True
-    else:
-        for layer in base_model.layers[:]:
-            layer.trainable = False
 
     tf.keras.backend.set_learning_phase(mode == tf.estimator.ModeKeys.TRAIN)
 
-    features = tf.identity(model_input['img'], name="input")  # Used when converting to unity
-
-    features = tf.keras.applications.resnet50.preprocess_input(features)
-    image_descriptors = base_model(features)
+    model_input = tf.identity(features['img'], name="input")  # Used when converting to unity
+    print(model_input)
+    img_features = tf.keras.applications.resnet50.preprocess_input(model_input, mode='tf')
+    image_descriptors = base_model(img_features)
     image_descriptors = tf.identity(image_descriptors, name="image_descriptors")
     # image_descriptors = tf.layers.dropout(image_descriptors, rate=0.5, training=is_training)
 
@@ -308,10 +301,10 @@ def real_domain_cnn_model_fn_predict(features, labels, mode):
     predictions = {
         # Generate predictions (for PREDICT and EVAL mode)
         "2d_prediction": logits,
-        "data_id": model_input['data_id'],
-        "object_index": model_input['object_index'],
-        "output_vector": model_input['ground_truth_output'],
-        "img": model_input['img']
+        "data_id":features['data_id'],
+        "object_index": features['object_index'],
+        "output_vector": features['ground_truth_output'],
+        "img": features['img']
     }
 
     if mode == tf.estimator.ModeKeys.PREDICT:

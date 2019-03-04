@@ -59,11 +59,10 @@ def tfrecord_parser(serialized_example):
     output_vector = tf.cast(features['output_vector'], tf.float32)
 
     model_input = {
-        "data_id": features['data_id'],
+        "data_id": data_id,
         "object_index": features['object_index'],
-        "img": features['object_image'],
-        "ground_truth_output": features["output_vector"]
-
+        "img": input_image,
+        "ground_truth_output": output_vector
     }
 
     return model_input, output_vector

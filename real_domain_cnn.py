@@ -36,7 +36,7 @@ def real_domain_cnn_model_fn(features, labels, mode):
     """
     # Features are images
     # Training End to End - So weights start from scratch
-    base_model = tf.keras.applications.resnet50.ResNet50(include_top=False, weights='imagenet')
+    base_model = tf.keras.applications.resnet50.ResNet50(include_top=False,  input_shape= (IMAGE_SIZE,IMAGE_SIZE,3), weights=None)
     is_training = (mode == tf.estimator.ModeKeys.TRAIN)
     if is_training:
         # Want to train all the layers
@@ -47,7 +47,7 @@ def real_domain_cnn_model_fn(features, labels, mode):
 
     features = tf.identity(features, name="input")  # Used when converting to unity
 
-    features = tf.keras.applications.resnet50.preprocess_input(features)
+    features = tf.keras.applications.resnet50.preprocess_input(features, mode='tf')
     image_descriptors = base_model(features)
     image_descriptors = tf.identity(image_descriptors, name="image_descriptors")
     # image_descriptors = tf.layers.dropout(image_descriptors, rate=0.5, training=is_training)
@@ -74,7 +74,7 @@ def real_domain_cnn_model_fn(features, labels, mode):
         learning_rate = tf.train.exponential_decay(
             learning_rate=STARTING_LR,
             global_step=global_step,
-            decay_steps=50000,
+            decay_steps=38000,
             decay_rate=0.1,
             staircase=True,
             name="learning_rate"
@@ -129,7 +129,7 @@ def train_input_fn():
     """
     dataset = tf.data.TFRecordDataset(TRAINING_TFRECORDS)
     dataset = dataset_base(dataset)
-    dataset = dataset.repeat(count=10)  # Train for count epochs
+    dataset = dataset.repeat(count=40)  # Train for count epochs
 
     iterator = dataset.make_one_shot_iterator()
     features, labels = iterator.get_next()
@@ -178,7 +178,7 @@ def tfrecord_parser(serialized_example):
     input_image = tf.reshape(input_image, (224, 224, 3))
 
     output_vector = tf.cast(features['output_vector'], tf.float32)
-
+    #input_image = tf.image.per_image_standardization(input_image)
     # blur_predicate = tf.math.greater(tf.random_uniform([1], 0, 1, dtype=tf.float32),  0.5)
     # input_image = tf.cond(blur_predicate, lambda: blur_image(input_image), lambda: input_image)
 
@@ -238,11 +238,13 @@ def main(model_dir):
 
         tensors_to_log = {"logits": "2d_predictions", "learning_rate": "learning_rate", }
         logging_hook = tf.train.LoggingTensorHook(tensors=tensors_to_log, every_n_iter=100)
+        
+        real_domain_cnn.train(input_fn=train_input_fn, hooks=[logging_hook])
+        
+        #train_spec = tf.estimator.TrainSpec(input_fn=train_input_fn, hooks=[logging_hook])
+        #eval_spec = tf.estimator.EvalSpec(input_fn=eval_input_fn, steps=250)
 
-        train_spec = tf.estimator.TrainSpec(input_fn=train_input_fn, hooks=[logging_hook])
-        eval_spec = tf.estimator.EvalSpec(input_fn=eval_input_fn, steps=600, start_delay_secs=300, throttle_secs=1000)
-
-        tf.estimator.train_and_evaluate(real_domain_cnn, train_spec, eval_spec)
+        #tf.estimator.train_and_evaluate(real_domain_cnn, train_spec, eval_spec)
 
         # acc_pi_6, med_error = run_eval(model_dir)
         # logging.debug("ACC PI/6: " + acc_pi_6 + " | Med Error: " + str(med_error) + " | Epochs Elapsed: " + str(40))
