@@ -6,7 +6,7 @@ import numpy as np
 import click
 import scipy.stats as st
 
-from eval_metrics import run_eval
+#from eval_metrics import run_eval
 #from tf.keras.applications.resnet50 import ResNet50, preprocess_input
 
 slim = tf.contrib.slim
@@ -36,7 +36,7 @@ def real_domain_cnn_model_fn(features, labels, mode):
     """
     # Features are images
     # Training End to End - So weights start from scratch
-    base_model = tf.keras.applications.resnet50.ResNet50(include_top=False, weights=None)
+    base_model = tf.keras.applications.resnet50.ResNet50(include_top=False, weights='imagenet')
     is_training = (mode == tf.estimator.ModeKeys.TRAIN)
     if is_training:
         # Want to train all the layers
@@ -74,7 +74,7 @@ def real_domain_cnn_model_fn(features, labels, mode):
         learning_rate = tf.train.exponential_decay(
             learning_rate=STARTING_LR, 
             global_step=global_step, 
-            decay_steps=28619,
+            decay_steps=50000,
             decay_rate=0.1,
             staircase=True,
             name="learning_rate"
@@ -113,7 +113,7 @@ def dimension_loss(dimension_labels, dimension_logits):
 
 def dataset_base(dataset, shuffle=True):
     if shuffle:
-        dataset = dataset.shuffle(buffer_size=28619)
+        dataset = dataset.shuffle(buffer_size=10000)
     
     dataset = dataset.map(map_func=tfrecord_parser, num_parallel_calls=NUM_CPU_CORES) #Parallelize data transformation
     dataset.apply(tf.contrib.data.ignore_errors())
@@ -126,7 +126,7 @@ def train_input_fn():
     """
     dataset = tf.data.TFRecordDataset(TRAINING_TFRECORDS)
     dataset = dataset_base(dataset)
-    dataset = dataset.repeat(count=50) #Train for count epochs
+    dataset = dataset.repeat(count=10) #Train for count epochs
     
     iterator = dataset.make_one_shot_iterator()
     features, labels = iterator.get_next()
@@ -153,9 +153,12 @@ def tfrecord_parser(serialized_example):
     features = tf.parse_single_example(
         serialized_example,
         # Defaults are not specified since both keys are required.
-        features={
+        features = {
             'object_image': tf.FixedLenFeature([], tf.string),
-            'output_vector': tf.FixedLenFeature([19], tf.float32)
+            'output_vector': tf.FixedLenFeature([19], tf.float32),
+            'data_id': tf.FixedLenFeature([], tf.string),
+            'object_index': tf.FixedLenFeature([], tf.int64),
+            'mirrored': tf.FixedLenFeature([], tf.int64)
         }
     )
 
@@ -175,7 +178,7 @@ def tfrecord_parser(serialized_example):
     input_image = tf.reshape(input_image, (224, 224, 3))
     
     output_vector = tf.cast(features['output_vector'], tf.float32)
-
+    
     # blur_predicate = tf.math.greater(tf.random_uniform([1], 0, 1, dtype=tf.float32),  0.5)
     # input_image = tf.cond(blur_predicate, lambda: blur_image(input_image), lambda: input_image)
 
@@ -237,7 +240,7 @@ def main(model_dir):
         logging_hook = tf.train.LoggingTensorHook(tensors=tensors_to_log, every_n_iter=100)
 
         train_spec = tf.estimator.TrainSpec(input_fn=train_input_fn, hooks=[logging_hook])
-        eval_spec = tf.estimator.EvalSpec(input_fn=eval_input_fn)
+        eval_spec = tf.estimator.EvalSpec(input_fn=eval_input_fn, steps=600, start_delay_secs=300, throttle_secs=1000)
 
         tf.estimator.train_and_evaluate(real_domain_cnn, train_spec, eval_spec)
 

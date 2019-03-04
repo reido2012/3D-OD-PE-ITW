@@ -35,13 +35,13 @@ EVAL_TFRECORDS = TFRECORDS_DIR + "pascal_val.tfrecords"
 @click.option('--generate_imgs', default=False, help='If true will plot model results 10 images and save them ')
 def main(model_dir, tfrecords_file, generate_imgs):
     tfrecords_file=str(tfrecords_file)
-    get_viewpoint_errors(model_dir, real_domain_cnn_model, tfrecords_file, generate_imgs)
+    get_viewpoint_errors(model_dir, real_domain_cnn_model_fn, tfrecords_file, generate_imgs)
 
 def run_eval(model_dir):
     return get_viewpoint_errors(model_dir, real_domain_cnn_model_fn_predict, EVAL_TFRECORDS, False)
 
 def predict_input_fn( tfrecords_file):
-    dataset = tf.data.TFRecordDataset(tfrecords_file).repeat(count=1)
+    dataset = tf.data.TFRecordDataset(tfrecords_file)
     dataset = dataset_base(dataset, shuffle=False)
 
     iterator = dataset.make_one_shot_iterator()
@@ -63,17 +63,14 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
         
         #yield single examples = False useful if model_fn returns some tensors whose first dimension is not equal to the batch size.
         all_model_predictions = real_domain_cnn.predict(input_fn=lambda : predict_input_fn(tfrecords_file), yield_single_examples=False)
-        
         #If yielding single examples uncomment the line below - do this if you have a tensor/batch error (slower)
         #all_model_predictions = get_single_examples_from_batch(all_model_predictions)
         
         for counter, model_prediction in enumerate(all_model_predictions):
-            print(counter)
-                
+            print(model_prediction)                
             model_output = model_prediction["2d_prediction"]
             image = np.uint8(model_prediction["img"])
             data_id = model_prediction["data_id"].decode('utf-8')
-            mirrored = bool(model_prediction["mirrored"])
             object_index = model_prediction["object_index"]
             ground_truth_output = model_prediction["output_vector"]
             print(counter)
