@@ -11,7 +11,8 @@ NUM_CPU_CORES = 8
 IMAGE_SIZE = 224 # To match ResNet dimensions 
 GREYSCALE_SIZE = tf.constant(50176)
 GREYSCALE_CHANNEL = tf.constant(1)
-    
+
+
 def dataset_base(dataset, shuffle=True):
     if shuffle:
         dataset = dataset.shuffle(buffer_size=SHUFFLE_BUFFER_SIZE)
@@ -56,8 +57,17 @@ def tfrecord_parser(serialized_example):
     input_image = tf.reshape(input_image, (224, 224, 3))
 
     output_vector = tf.cast(features['output_vector'], tf.float32)
-    
-    return input_image, output_vector
+
+    model_input = {
+        "data_id": features['data_id'],
+        "object_index": features['object_index'],
+        "img": features['object_image'],
+        "ground_truth_output": features["output_vector"]
+
+    }
+
+    return model_input, output_vector
+
 
 def train_input_fn(tfrecords):
     """
@@ -70,6 +80,7 @@ def train_input_fn(tfrecords):
     features, labels = iterator.get_next()
     return features, labels
 
+
 def predict_input_fn(tfrecords):
     dataset = tf.data.TFRecordDataset(tfrecords)
     dataset = dataset_base(dataset, shuffle=False)
@@ -77,7 +88,8 @@ def predict_input_fn(tfrecords):
     iterator = dataset.make_one_shot_iterator()
     features, labels = iterator.get_next()
     return features, labels
-        
+
+
 def eval_input_fn(tfrecords):
     """
     Builds an input pipeline that yields batches of feature and label pairs for evaluation 

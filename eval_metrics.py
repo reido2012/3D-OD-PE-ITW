@@ -16,7 +16,7 @@ from scipy.linalg import logm
 from nets import nets_factory
 from pascal3d import utils
 from itertools import product
-from model_dataset_utils import predict_input_fn, dataset_base
+from model_dataset_utils import dataset_base
 from check_tfrecords import line_boxes
 from real_domain_cnn import real_domain_cnn_model_fn
 
@@ -37,8 +37,10 @@ def main(model_dir, tfrecords_file, generate_imgs):
     tfrecords_file=str(tfrecords_file)
     get_viewpoint_errors(model_dir, real_domain_cnn_model_fn, tfrecords_file, generate_imgs)
 
+
 def run_eval(model_dir):
     return get_viewpoint_errors(model_dir, real_domain_cnn_model_fn_predict, EVAL_TFRECORDS, False)
+
 
 def predict_input_fn( tfrecords_file):
     dataset = tf.data.TFRecordDataset(tfrecords_file)
@@ -47,6 +49,7 @@ def predict_input_fn( tfrecords_file):
     iterator = dataset.make_one_shot_iterator()
     features, labels = iterator.get_next()
     return features, labels
+
 
 def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
     """
@@ -269,6 +272,50 @@ def apply_transformation(cube, transformation_matrix):
         transformed_cube.append(new_vector[:3])
 
     return np.array(transformed_cube)
+
+
+def real_domain_cnn_model_fn_predict(features, labels, mode):
+    """
+    Real Domain CNN from 3D Object Detection and Pose Estimation paper
+    """
+    # Features are images
+    model_input = features
+    # Training End to End - So weights start from scratch
+    base_model = tf.keras.applications.resnet50.ResNet50(include_top=False, weights='imagenet')
+    is_training = (mode == tf.estimator.ModeKeys.TRAIN)
+
+    if is_training:
+        # Want to train all the layers
+        for layer in base_model.layers[:]:
+            layer.trainable = True
+    else:
+        for layer in base_model.layers[:]:
+            layer.trainable = False
+
+    tf.keras.backend.set_learning_phase(mode == tf.estimator.ModeKeys.TRAIN)
+
+    features = tf.identity(model_input['img'], name="input")  # Used when converting to unity
+
+    features = tf.keras.applications.resnet50.preprocess_input(features)
+    image_descriptors = base_model(features)
+    image_descriptors = tf.identity(image_descriptors, name="image_descriptors")
+    # image_descriptors = tf.layers.dropout(image_descriptors, rate=0.5, training=is_training)
+
+    # Add a dense layer to get the 19 neuron linear output layer
+    logits = tf.layers.dense(image_descriptors, 19, kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=0.0001))
+    logits = tf.squeeze(logits, name='2d_predictions')
+
+    predictions = {
+        # Generate predictions (for PREDICT and EVAL mode)
+        "2d_prediction": logits,
+        "data_id": model_input['data_id'],
+        "object_index": model_input['object_index'],
+        "output_vector": model_input['ground_truth_output'],
+        "img": model_input['img']
+    }
+
+    if mode == tf.estimator.ModeKeys.PREDICT:
+        return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
 
 
 if __name__ == "__main__":
