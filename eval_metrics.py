@@ -13,7 +13,7 @@ import click
 from tqdm import tqdm
 from numpy import linalg as LA
 from scipy.linalg import logm
-from nets import nets_factory
+from nets import nets_factory, resnet_v1
 from pascal3d import utils
 from itertools import product
 from model_dataset_utils import dataset_base
@@ -27,12 +27,17 @@ data_type = 'all'
 DATASET = pascal3d.dataset.Pascal3DDataset(data_type, dataset_path="/home/omarreid/selerio/datasets/PASCAL3D+_release1.1", generate=True)
 TFRECORDS_DIR = "/home/omarreid/selerio/datasets/real_domain_tfrecords/"
 EVAL_TFRECORDS = TFRECORDS_DIR + "pascal_val.tfrecords"
+RESNET_V1_CHECKPOINT_DIR = "/home/omarreid/selerio/datasets/pre_trained_weights/resnet_v1_50.ckpt"
+NETWORK_NAME = 'resnet_v1_50'
+MODEL_DIR = ""
 
 @click.command()
 @click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/models/test_five", help='Path to model to evaluate')
 @click.option('--tfrecords_file', default=EVAL_TFRECORDS, help='Path to TFRecords file to evaluate model on', type=str)
 @click.option('--generate_imgs', default=False, help='If true will plot model results 10 images and save them ')
 def main(model_dir, tfrecords_file, generate_imgs):
+    global MODEL_DIR
+    MODEL_DIR = model_dir
     tfrecords_file=str(tfrecords_file)
     get_viewpoint_errors(model_dir, real_domain_cnn_model_fn_predict, tfrecords_file, generate_imgs)
 
@@ -276,27 +281,35 @@ def real_domain_cnn_model_fn_predict(features, labels, mode):
     """
     Real Domain CNN from 3D Object Detection and Pose Estimation paper
     """
+
     # Training End to End - So weights start from scratch
-    base_model = tf.keras.applications.resnet50.ResNet50(include_top=False, weights='/home/omarreid/selerio/final_year_project/models/test_five/model.ckpt')
-    is_training = (mode == tf.estimator.ModeKeys.TRAIN)
+    input_images = tf.identity(features['img'], name="input")  # Used when converting to unity
 
-    if is_training:
-        # Want to train all the layers
-        for layer in base_model.layers[:]:
-            layer.trainable = True
+    with slim.arg_scope(resnet_v1.resnet_arg_scope()):
+        # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
+        network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=False)
+        image_descriptors, endpoints = network_fn(input_images)
 
-    tf.keras.backend.set_learning_phase(mode == tf.estimator.ModeKeys.TRAIN)
-
-    model_input = tf.identity(features['img'], name="input")  # Used when converting to unity
-    print(model_input)
-    img_features = tf.keras.applications.resnet50.preprocess_input(model_input, mode='tf')
-    image_descriptors = base_model(img_features)
     image_descriptors = tf.identity(image_descriptors, name="image_descriptors")
-    # image_descriptors = tf.layers.dropout(image_descriptors, rate=0.5, training=is_training)
 
     # Add a dense layer to get the 19 neuron linear output layer
     logits = tf.layers.dense(image_descriptors, 19, kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=0.0001))
     logits = tf.squeeze(logits, name='2d_predictions')
+
+    # Warn the user if a checkpoint exists in the train_dir. Then we'll be ignoring the checkpoint anyway.
+    if tf.train.latest_checkpoint(MODEL_DIR):
+        tf.logging.info(
+            'Ignoring RESNET50 CKPT because a checkpoint already exists in %s'
+            % MODEL_DIR)
+
+    if tf.gfile.IsDirectory(MODEL_DIR):
+        checkpoint_path = tf.train.latest_checkpoint(MODEL_DIR)
+    else:
+        checkpoint_path = RESNET_V1_CHECKPOINT_DIR
+
+    variables_to_restore = slim.get_variables_to_restore()
+    tf.train.init_from_checkpoint(checkpoint_path,
+                                  {v.name.split(':')[0]: v for v in variables_to_restore})
 
     predictions = {
         # Generate predictions (for PREDICT and EVAL mode)
@@ -309,6 +322,10 @@ def real_domain_cnn_model_fn_predict(features, labels, mode):
 
     if mode == tf.estimator.ModeKeys.PREDICT:
         return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
+
+
+
+
 
 
 if __name__ == "__main__":

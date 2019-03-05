@@ -4,10 +4,9 @@ import math
 import tensorflow as tf
 import numpy as np
 import click
+import os
 import scipy.stats as st
-
-# from eval_metrics import run_eval
-# from tf.keras.applications.resnet50 import ResNet50, preprocess_input
+from nets import nets_factory, resnet_v1
 
 slim = tf.contrib.slim
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -16,6 +15,8 @@ TFRECORDS_DIR = "/home/omarreid/selerio/datasets/real_domain_tfrecords/"
 TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR + "pascal_train.tfrecords",
                       TFRECORDS_DIR + "imagenet_val.tfrecords"]
 EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
+RESNET_V1_CHECKPOINT_DIR = "/home/omarreid/selerio/datasets/pre_trained_weights/resnet_v1_50.ckpt"
+NETWORK_NAME = 'resnet_v1_50'
 BATCH_SIZE = 30
 NUM_CPU_CORES = 8
 IMAGE_SIZE = 224  # To match ResNet dimensions
@@ -28,29 +29,22 @@ GAMMA = math.exp(-3)
 TRIPLET_LOSS_MARGIN = 1
 HUBER_LOSS_DELTA = 0.01
 STARTING_LR = 0.0001
+MODEL_DIR = ""
 
 
 def real_domain_cnn_model_fn(features, labels, mode):
     """
     Real Domain CNN from 3D Object Detection and Pose Estimation paper
     """
-    # Features are images
-    # Training End to End - So weights start from scratch
-    base_model = tf.keras.applications.resnet50.ResNet50(include_top=False,  input_shape= (IMAGE_SIZE,IMAGE_SIZE,3), weights=None)
-    is_training = (mode == tf.estimator.ModeKeys.TRAIN)
-    if is_training:
-        # Want to train all the layers
-        for layer in base_model.layers[:]:
-            layer.trainable = True
-
-    tf.keras.backend.set_learning_phase(mode == tf.estimator.ModeKeys.TRAIN)
-
     features = tf.identity(features, name="input")  # Used when converting to unity
+    is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
-    features = tf.keras.applications.resnet50.preprocess_input(features, mode='tf')
-    image_descriptors = base_model(features)
+    with slim.arg_scope(resnet_v1.resnet_arg_scope()):
+        # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
+        network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=is_training)
+        image_descriptors, endpoints = network_fn(features)
+
     image_descriptors = tf.identity(image_descriptors, name="image_descriptors")
-    # image_descriptors = tf.layers.dropout(image_descriptors, rate=0.5, training=is_training)
 
     # Add a dense layer to get the 19 neuron linear output layer
     logits = tf.layers.dense(image_descriptors, 19, kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=0.0001))
@@ -63,6 +57,22 @@ def real_domain_cnn_model_fn(features, labels, mode):
 
     if mode == tf.estimator.ModeKeys.PREDICT:
         return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
+
+    # Warn the user if a checkpoint exists in the train_dir. Then we'll be
+    # ignoring the checkpoint anyway.
+    if tf.train.latest_checkpoint(MODEL_DIR):
+        tf.logging.info(
+            'Ignoring RESNET50 CKPT because a checkpoint already exists in %s'
+            % MODEL_DIR)
+
+    if tf.gfile.IsDirectory(MODEL_DIR):
+        checkpoint_path = tf.train.latest_checkpoint(MODEL_DIR)
+    else:
+        checkpoint_path = RESNET_V1_CHECKPOINT_DIR
+
+    variables_to_restore = slim.get_variables_to_restore()
+    tf.train.init_from_checkpoint(checkpoint_path,
+                                  {v.name.split(':')[0]: v for v in variables_to_restore})
 
     # create a pose_loss function so that we can ge tthe loss
     loss = pose_loss(labels, logits)
@@ -178,7 +188,7 @@ def tfrecord_parser(serialized_example):
     input_image = tf.reshape(input_image, (224, 224, 3))
 
     output_vector = tf.cast(features['output_vector'], tf.float32)
-    #input_image = tf.image.per_image_standardization(input_image)
+    input_image = tf.image.per_image_standardization(input_image)
     # blur_predicate = tf.math.greater(tf.random_uniform([1], 0, 1, dtype=tf.float32),  0.5)
     # input_image = tf.cond(blur_predicate, lambda: blur_image(input_image), lambda: input_image)
 
@@ -229,6 +239,8 @@ def make_gauss_var(name, size, sigma, c_i):
 def main(model_dir):
     # Create your own input function - https://www.tensorflow.org/guide/custom_estimators
     # To handle all of our TF Records
+    global MODEL_DIR
+    MODEL_DIR = model_dir
     with tf.device("/device:GPU:0"):
         # Create the Estimator
         real_domain_cnn = tf.estimator.Estimator(

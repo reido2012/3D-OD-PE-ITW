@@ -93,7 +93,7 @@ def eval_input_fn(tfrecords):
     """
     Builds an input pipeline that yields batches of feature and label pairs for evaluation 
     """
-    dataset = tf.data.TFRecordDataset(tfrecords).repeat(count=1)
+    dataset = tf.data.TFRecordDataset(tfrecords)
     dataset = dataset_base(dataset, shuffle=False)
     
     iterator = dataset.make_one_shot_iterator()
