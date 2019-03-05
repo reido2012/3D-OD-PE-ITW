@@ -302,14 +302,9 @@ def real_domain_cnn_model_fn_predict(features, labels, mode):
             'Ignoring RESNET50 CKPT because a checkpoint already exists in %s'
             % MODEL_DIR)
 
-    if tf.gfile.IsDirectory(MODEL_DIR):
-        checkpoint_path = tf.train.latest_checkpoint(MODEL_DIR)
-    else:
-        checkpoint_path = RESNET_V1_CHECKPOINT_DIR
-
+    checkpoint_path = tf.train.latest_checkpoint(MODEL_DIR)
     variables_to_restore = slim.get_variables_to_restore()
-    tf.train.init_from_checkpoint(checkpoint_path,
-                                  {v.name.split(':')[0]: v for v in variables_to_restore})
+    tf.train.init_from_checkpoint(checkpoint_path,  {v.name.split(':')[0]: v for v in variables_to_restore})
 
     predictions = {
         # Generate predictions (for PREDICT and EVAL mode)

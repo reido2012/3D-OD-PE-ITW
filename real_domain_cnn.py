@@ -65,14 +65,15 @@ def real_domain_cnn_model_fn(features, labels, mode):
             'Ignoring RESNET50 CKPT because a checkpoint already exists in %s'
             % MODEL_DIR)
 
-    if tf.gfile.IsDirectory(MODEL_DIR):
-        checkpoint_path = tf.train.latest_checkpoint(MODEL_DIR)
-    else:
-        checkpoint_path = RESNET_V1_CHECKPOINT_DIR
-
     variables_to_restore = slim.get_variables_to_restore()
-    tf.train.init_from_checkpoint(checkpoint_path,
-                                  {v.name.split(':')[0]: v for v in variables_to_restore})
+    
+    if tf.gfile.IsDirectory(MODEL_DIR):
+        checkpoint_path = tf.train.latest_checkpointi(MODEL_DIR)
+    else:
+        checkpoint_path = RESNET_V1_CHECKPOINT_DIR 
+        variables_to_restore = [v  for v in variables_to_restore if 'resnet_v1_50/' in v.name]
+    
+    tf.train.init_from_checkpoint(checkpoint_path, {v.name.split(':')[0]: v for v in variables_to_restore})
 
     # create a pose_loss function so that we can ge tthe loss
     loss = pose_loss(labels, logits)
