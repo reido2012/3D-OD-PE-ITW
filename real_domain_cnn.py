@@ -47,7 +47,7 @@ def real_domain_cnn_model_fn(features, labels, mode):
     image_descriptors = tf.identity(image_descriptors, name="image_descriptors")
 
     # Add a dense layer to get the 19 neuron linear output layer
-    logits = tf.layers.dense(image_descriptors, 19, kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=0.0001))
+    logits = tf.layers.dense(image_descriptors, 19)
     logits = tf.squeeze(logits, name='2d_predictions')
 
     predictions = {
@@ -68,7 +68,7 @@ def real_domain_cnn_model_fn(features, labels, mode):
     variables_to_restore = slim.get_variables_to_restore()
     
     if tf.gfile.IsDirectory(MODEL_DIR):
-        checkpoint_path = tf.train.latest_checkpointi(MODEL_DIR)
+        checkpoint_path = tf.train.latest_checkpoint(MODEL_DIR)
     else:
         checkpoint_path = RESNET_V1_CHECKPOINT_DIR 
         variables_to_restore = [v  for v in variables_to_restore if 'resnet_v1_50/' in v.name]
@@ -85,7 +85,7 @@ def real_domain_cnn_model_fn(features, labels, mode):
         learning_rate = tf.train.exponential_decay(
             learning_rate=STARTING_LR,
             global_step=global_step,
-            decay_steps=38000,
+            decay_steps=50000,
             decay_rate=0.1,
             staircase=True,
             name="learning_rate"
@@ -140,7 +140,7 @@ def train_input_fn():
     """
     dataset = tf.data.TFRecordDataset(TRAINING_TFRECORDS)
     dataset = dataset_base(dataset)
-    dataset = dataset.repeat(count=40)  # Train for count epochs
+    dataset = dataset.repeat(count=10)  # Train for count epochs
 
     iterator = dataset.make_one_shot_iterator()
     features, labels = iterator.get_next()
@@ -235,7 +235,7 @@ def make_gauss_var(name, size, sigma, c_i):
 
 
 @click.command()
-@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/models/model_two",
+@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/models/model_one",
               help='Path to model to evaluate')
 def main(model_dir):
     # Create your own input function - https://www.tensorflow.org/guide/custom_estimators
@@ -252,12 +252,12 @@ def main(model_dir):
         tensors_to_log = {"logits": "2d_predictions", "learning_rate": "learning_rate", }
         logging_hook = tf.train.LoggingTensorHook(tensors=tensors_to_log, every_n_iter=100)
         
-        real_domain_cnn.train(input_fn=train_input_fn, hooks=[logging_hook])
+        #real_domain_cnn.train(input_fn=train_input_fn, hooks=[logging_hook])
         
-        #train_spec = tf.estimator.TrainSpec(input_fn=train_input_fn, hooks=[logging_hook])
-        #eval_spec = tf.estimator.EvalSpec(input_fn=eval_input_fn, steps=250)
+        train_spec = tf.estimator.TrainSpec(input_fn=train_input_fn, hooks=[logging_hook])
+        eval_spec = tf.estimator.EvalSpec(input_fn=eval_input_fn)
 
-        #tf.estimator.train_and_evaluate(real_domain_cnn, train_spec, eval_spec)
+        tf.estimator.train_and_evaluate(real_domain_cnn, train_spec, eval_spec)
 
         # acc_pi_6, med_error = run_eval(model_dir)
         # logging.debug("ACC PI/6: " + acc_pi_6 + " | Med Error: " + str(med_error) + " | Epochs Elapsed: " + str(40))

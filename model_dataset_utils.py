@@ -55,13 +55,15 @@ def tfrecord_parser(serialized_example):
     channel_pred = tf.cast(tf.equal(tf.shape(input_image)[2], GREYSCALE_CHANNEL), tf.bool)
     input_image = tf.cond(channel_pred, lambda: tf.image.grayscale_to_rgb(input_image), lambda: input_image)
     input_image = tf.reshape(input_image, (224, 224, 3))
-
+    normal_img = input_image
+    input_image = tf.image.per_image_standardization(input_image)
     output_vector = tf.cast(features['output_vector'], tf.float32)
 
     model_input = {
         "data_id": data_id,
         "object_index": features['object_index'],
         "img": input_image,
+        "normal_img": normal_img,
         "ground_truth_output": output_vector
     }
 

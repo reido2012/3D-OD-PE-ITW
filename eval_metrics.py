@@ -32,7 +32,7 @@ NETWORK_NAME = 'resnet_v1_50'
 MODEL_DIR = ""
 
 @click.command()
-@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/models/test_five", help='Path to model to evaluate')
+@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/models/test_one", help='Path to model to evaluate')
 @click.option('--tfrecords_file', default=EVAL_TFRECORDS, help='Path to TFRecords file to evaluate model on', type=str)
 @click.option('--generate_imgs', default=False, help='If true will plot model results 10 images and save them ')
 def main(model_dir, tfrecords_file, generate_imgs):
@@ -69,27 +69,28 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
         all_differences= []
         
         #yield single examples = False useful if model_fn returns some tensors whose first dimension is not equal to the batch size.
-        all_model_predictions = real_domain_cnn.predict(input_fn=lambda : predict_input_fn(tfrecords_file), yield_single_examples=True)
+        all_model_predictions = real_domain_cnn.predict(input_fn=lambda : predict_input_fn(tfrecords_file), yield_single_examples=False)
         #If yielding single examples uncomment the line below - do this if you have a tensor/batch error (slower)
-        #all_model_predictions = get_single_examples_from_batch(all_model_predictions)
+        all_model_predictions = get_single_examples_from_batch(all_model_predictions)
         
         for counter, model_prediction in enumerate(all_model_predictions):
             model_output = model_prediction["2d_prediction"]
-            image = np.uint8(model_prediction["img"])
+            image = np.uint8(model_prediction["original_img"])
+            #img_1d = np.fromstring(model_prediction["original_img"], dtype=np.uint8)
+            #image = img_1d.reshape((224, 224, -1))
             data_id = model_prediction["data_id"].decode('utf-8')
             object_index = model_prediction["object_index"]
             ground_truth_output = model_prediction["output_vector"]
-            print(counter)
+            print("Data ID: ")
             print(data_id)
-            print(object_index)
             
             ground_truth_rotation_matrix, focal, viewpoint_obj = get_ground_truth_rotation_matrix(data_id, object_index)
             pred_rotation_matrix, reprojected_virtual_control_points = get_predicted_3d_pose(model_output, focal, ground_truth_output)
              
-            print("Ground Truth Rotation Matrix")
-            print(ground_truth_rotation_matrix)
-            print("Predicted Rotation Matrix")
-            print(pred_rotation_matrix)
+            #print("Ground Truth Rotation Matrix")
+            #print(ground_truth_rotation_matrix)
+            #print("Predicted Rotation Matrix")
+            #print(pred_rotation_matrix)
             
             difference = viewpoint_prediction_difference(ground_truth_rotation_matrix, pred_rotation_matrix)
             
@@ -166,7 +167,7 @@ def get_single_examples_from_batch(all_model_predictions):
         output_vectors = output_batch['output_vector']
         predictions_2d = output_batch['2d_prediction']
         images = output_batch['img']
-        
+        original_images = output_batch['original_img']
         number_in_batch = min(len(data_ids), len(object_indices), len(output_vectors), len(predictions_2d), len(images))
         
         if type(predictions_2d[0]) is not np.ndarray:
@@ -176,7 +177,8 @@ def get_single_examples_from_batch(all_model_predictions):
               "data_id": data_ids[0],
                 "object_index": object_indices[0],
                 "output_vector": output_vectors[0],
-                "img": images[0], 
+                "img": images[0],
+                "original_img": original_images[0], 
                 "2d_prediction": predictions_2d     
             })
         else:       
@@ -185,7 +187,8 @@ def get_single_examples_from_batch(all_model_predictions):
                     "data_id": data_ids[index],
                     "object_index": object_indices[index],
                     "output_vector": output_vectors[index],
-                    "img": images[index], 
+                    "img": images[index],
+                    "original_img": original_images[index], 
                     "2d_prediction": predictions_2d[index]     
                 })
 
@@ -197,14 +200,14 @@ def get_predicted_3d_pose(output_vector, focal, ground_truth_output):
     """
     predicted_dims = np.array(output_vector[16:])
     virtual_control_points_2d = np.array(output_vector[:16]).reshape(8,2) #These points are normalized
-    print("GT VC")
-    print(ground_truth_output[:16].reshape(8,2)*224)
-    print("PRED VC")
-    print(virtual_control_points_2d*224)
-    print("GT DIMS")
-    print(ground_truth_output[16:])
-    print("PRED DIMS")
-    print(predicted_dims)
+    #print("GT VC")
+    #print(ground_truth_output[:16].reshape(8,2)*224)
+    #print("PRED VC")
+    #print(virtual_control_points_2d)
+    #print("GT DIMS")
+    #print(ground_truth_output[16:])
+    #print("PRED DIMS")
+    #print(predicted_dims)
 
     scaled_unit_cube = compute_scaled_unit_cube(predicted_dims).astype(np.float32)
     
@@ -227,8 +230,8 @@ def get_predicted_3d_pose(output_vector, focal, ground_truth_output):
     projected_cube = cv2.projectPoints(scaled_unit_cube, rotation_vector, translation_vector,camera_matrix, None, aspectRatio=aspect_ratio)[0]
     reprojected_vc_points = projected_cube.reshape(8,2)
 
-    print("Reprojected VC Points")
-    print(reprojected_vc_points)
+    #print("Reprojected VC Points")
+    #print(reprojected_vc_points)
     
     rotation_matrix = cv2.Rodrigues(rotation_vector)[0]
 
@@ -287,7 +290,7 @@ def real_domain_cnn_model_fn_predict(features, labels, mode):
 
     with slim.arg_scope(resnet_v1.resnet_arg_scope()):
         # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
-        network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=False)
+        network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=True)
         image_descriptors, endpoints = network_fn(input_images)
 
     image_descriptors = tf.identity(image_descriptors, name="image_descriptors")
@@ -312,7 +315,8 @@ def real_domain_cnn_model_fn_predict(features, labels, mode):
         "data_id":features['data_id'],
         "object_index": features['object_index'],
         "output_vector": features['ground_truth_output'],
-        "img": features['img']
+        "img": features['img'],
+        "original_img": features['normal_img']
     }
 
     if mode == tf.estimator.ModeKeys.PREDICT:

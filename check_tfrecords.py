@@ -8,7 +8,7 @@ import numpy as np
 import skimage.io as io
 import tensorflow as tf
 OVERFIT_TEST_TFRECORDS = "/notebooks/selerio/overfit_check.tfrecords"
-EVAL_TEST_TFRECORDS =  "/notebooks/selerio/eval_check.tfrecords"
+EVAL_TEST_TFRECORDS =  "/home/omarreid/selerio/datasets/real_domain_tfrecords/imagenet_val.tfrecords"
 
 def line_boxes(axis, virtual_control_points_pred, current_color):
     # Connect Points to Visualize Cube
@@ -56,6 +56,7 @@ def main():
         reconstructed_img = img_1d.reshape((224, 224, -1))
 
         reconstructed_records.append((reconstructed_img, output_vector))
+        break
 
     print(len(reconstructed_records))
 
@@ -132,20 +133,21 @@ def main():
         ax.imshow(image)
         ax2.imshow(image)
         current_color = 'b'
-        output_vector_predicted = overfit_test_model_output_vectors[counter]
-
+        
+        #output_vector_predicted = overfit_test_model_output_vectors[counter]
+        print(np.array(output_vector))
         virtual_control_points = np.array(output_vector[:16]).reshape(8,2) * 224
         print("Real Labels:")
         print(virtual_control_points)
-        virtual_control_points_pred = np.array(output_vector_predicted[:16]).reshape(8,2) * 224
-        print("Predicted Labels:")
-        print(virtual_control_points_pred)
-        ax.scatter(virtual_control_points[:, 0], virtual_control_points[:, 1], c='r')
-        ax2.scatter(virtual_control_points_pred[:, 0], virtual_control_points_pred[:, 1])
-        line_boxes(ax2, virtual_control_points_pred, 'b')
-        line_boxes(ax, virtual_control_points, 'r')
+        #virtual_control_points_pred = np.array(output_vector_predicted[:16]).reshape(8,2) * 224
+        #print("Predicted Labels:")
+        #print(virtual_control_points_pred)
+        #ax.scatter(virtual_control_points[:, 0], virtual_control_points[:, 1], c='r')
+        #ax2.scatter(virtual_control_points_pred[:, 0], virtual_control_points_pred[:, 1])
+        #line_boxes(ax2, virtual_control_points_pred, 'b')
+        #line_boxes(ax, virtual_control_points, 'r')
 
-        plt.savefig("./{}_check.jpg".format(counter))
+        #plt.savefig("./{}_check.jpg".format(counter))
         print("Done")
 
-
+main()
