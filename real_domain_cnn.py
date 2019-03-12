@@ -4,6 +4,7 @@ import math
 import tensorflow as tf
 import numpy as np
 import click
+import cv2 
 import os
 import scipy.stats as st
 from nets import nets_factory, resnet_v1
@@ -17,7 +18,7 @@ TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR 
 EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
 RESNET_V1_CHECKPOINT_DIR = "/home/omarreid/selerio/datasets/pre_trained_weights/resnet_v1_50.ckpt"
 NETWORK_NAME = 'resnet_v1_50'
-BATCH_SIZE = 30
+BATCH_SIZE = 40
 NUM_CPU_CORES = 8
 IMAGE_SIZE = 224  # To match ResNet dimensions
 GREYSCALE_SIZE = tf.constant(50176)
@@ -187,12 +188,13 @@ def tfrecord_parser(serialized_example):
     channel_pred = tf.cast(tf.equal(tf.shape(input_image)[2], GREYSCALE_CHANNEL), tf.bool)
     input_image = tf.cond(channel_pred, lambda: tf.image.grayscale_to_rgb(input_image), lambda: input_image)
     input_image = tf.reshape(input_image, (224, 224, 3))
+    
+    #blur_predicate = tf.cast(tf.greater(tf.random_uniform([], 0, 1),  0.5), tf.bool)
+    #input_image = tf.cond(blur_predicate, lambda: blur_image(input_image), lambda: input_image)
 
     output_vector = tf.cast(features['output_vector'], tf.float32)
     input_image = tf.image.per_image_standardization(input_image)
-    # blur_predicate = tf.math.greater(tf.random_uniform([1], 0, 1, dtype=tf.float32),  0.5)
-    # input_image = tf.cond(blur_predicate, lambda: blur_image(input_image), lambda: input_image)
-
+    
     return input_image, output_vector
 
 
@@ -203,35 +205,53 @@ def blur_image(input_image):
 
 def conv(input_image, filter_size, sigma, padding='SAME'):
     # Get the number of channels in the input
-    c_i = input_image.get_shape().as_list()[3]
+    print("Image Shape: ")
+    print(tf.shape(input_image))
+    c_i = input_image.get_shape().as_list()[2]
     # Convolution for a given input and kernel
     kernel = make_gauss_var('gauss_weight', filter_size, sigma, c_i)
-    output = tf.nn.depthwise_conv2d(input_image, kernel, [1, 1, 1, 1], padding=padding)
+    output = tf.nn.conv2d(tf.stack([input_image], name="packed"), kernel, [1, 1, 1, 1], padding=padding)
     return output
 
 
 def get_random_gauss_atr():
-    random_size = tf.random.uniform([1], 3, 21, dtype=tf.int64)
-    random_sigma = tf.random.uniform([1], 0, 4, dtype=tf.float32)
+    random_size = tf.random_uniform([], 3, 21, dtype=tf.int64)
+    random_sigma = tf.random_uniform([], 0, 4, dtype=tf.float32)
     return random_size, random_sigma
 
 
 def gauss_kernel(kernlen=21, nsig=3, channels=1):
-    interval = (2 * nsig + 1.) / (kernlen)
-    x = np.linspace(-nsig - interval / 2., nsig + interval / 2., kernlen + 1)
-    kern1d = np.diff(st.norm.cdf(x))
-    kernel_raw = np.sqrt(np.outer(kern1d, kern1d))
-    kernel = kernel_raw / kernel_raw.sum()
-    out_filter = np.array(kernel, dtype=np.float32)
+    interval = (2 * nsig + 1.) / tf.cast(kernlen, tf.float32)
+    x = tf.linspace(-nsig - interval / 2., nsig + interval / 2., kernlen + 1)
+    d = tf.distributions.Normal(tf.constant(0, dtype=tf.float32), nsig)
+    cdf_val = d.cdf(x)
+    kern1d = cdf_val[1:] - cdf_val[:-1]
+    outer_val =  kern1d[..., None] * kern1d[None, ...]
+    kernel_raw = tf.sqrt(outer_val)
+    kernel = kernel_raw / tf.reduce_sum(kernel_raw)
+    out_filter = np.array(kernel, dtype = np.float32)
     out_filter = out_filter.reshape((kernlen, kernlen, 1, 1))
-    out_filter = np.repeat(out_filter, channels, axis=2)
+    out_filter = np.repeat(out_filter, channels, axis = 2)
+    out_filter = tf.convert_to_tensor(out_filter, dtype=tf.float32)
     return out_filter
 
+def gaussian_kernel(size,std):
+    """Makes 2D gaussian Kernel for convolution."""
+    d = tf.distributions.Normal(tf.constant(0, dtype=tf.float32), std)
+    size = tf.cast(size, tf.float32)
+    vals = d.prob(tf.range(start = tf.constant(-1, dtype=tf.float32) * size, limit = size + 1))
+
+    gauss_kernel = tf.einsum('i,j->ij',
+                                  vals,
+                                  vals)
+
+    return gauss_kernel / tf.reduce_sum(gauss_kernel)
 
 def make_gauss_var(name, size, sigma, c_i):
     kernel = gauss_kernel(size, sigma, c_i)
-    var = tf.Variable(tf.convert_to_tensor(kernel), name=name)
-    return var
+    #kernel = kernel[:, :, tf.newaxis, tf.newaxis]
+    #kernel = tf.Variable(tf.convert_to_tensor(kernel), name=name)
+    return kernel
 
 
 @click.command()
