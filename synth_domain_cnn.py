@@ -76,6 +76,7 @@ def get_resnet_descriptors(depth_image, is_training):
     with slim.arg_scope(resnet_v1.resnet_arg_scope()):
         # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
         network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=is_training)
+        depth_image = tf.reshape(depth_image, (224, 224, 3))
         image_descriptors, endpoints = network_fn(depth_image)
 
         return image_descriptors
@@ -120,7 +121,11 @@ def tfrecord_parser(serialized_example):
         }
     )
 
-    rgb_image = convert_string_to_image(features['rgb_image'])
+    # rgb_image = convert_string_to_image(features['rgb_image'])
+    rgb_image = tf.decode_raw(features['rgb_image'], tf.uint8)
+    rgb_image = tf.to_float(rgb_image)
+    rgb_image = tf.reshape(rgb_image, (IMAGE_SIZE, IMAGE_SIZE, 3))
+
     pos_depth_image = convert_string_to_image(features['pos_depth'])
     data_id = features['data_id']
     obj_id = features['object_index']
@@ -134,27 +139,19 @@ def tfrecord_parser(serialized_example):
 
     pos_depth_path = synth_base + data_id + slash + obj_id + under + cad_index + tf.constant("_0001.png", dtype=tf.string)
     pos_depth_path = tf.Print(pos_depth_path, [pos_depth_path])
-    # Take a random depth image from this path that isn't the correct cad index
-    # all_depths = synth_base + data_id + slash + obj_id + tf.constant("_*_0001.png", dtype=tf.string)
-    # [!_]
-    # all_depths = "/home/omarreid/selerio/datasets/synth_renderings/" + data_id + "/" + obj_id + "_*_0001.png"
-    all_depths = "/home/omarreid/selerio/datasets/synth_renderings/" + data_id + "/" + obj_id + "_[!" + cad_index + "]*_0001.png"
 
+    all_depths = "/home/omarreid/selerio/datasets/synth_renderings/" + data_id + "/" + obj_id + "_[!" + cad_index + "]*_0001.png"
     depth_paths = tf.train.match_filenames_once(all_depths)
-    # depth_paths = tf.gfile.Glob(all_depths)
-    # depth_paths.remove(pos_depth_path)
 
     random_index = tf.random_uniform([1], 0, tf.size(depth_paths), dtype=tf.int32)
     random_index = tf.squeeze(random_index, 0)
-    print(tf.size(depth_paths))
-    print(random_index)
-    single_path = tf.gather(depth_paths, random_index)
-    single_path = tf.Print(single_path, [single_path], message="Single Path: ")
+
     random_index = tf.Print(random_index, [random_index], message="Random Index: ")
     depth_paths = tf.Print(depth_paths, [depth_paths], message="Depth Paths: ")
 
     negative_depth_image_raw = tf.read_file(depth_paths[random_index])
-    negative_depth_image = tf.image.decode_image(negative_depth_image_raw)
+    negative_depth_image = tf.image.decode_image(negative_depth_image_raw, 3)
+
 
     return (rgb_image, pos_depth_image, negative_depth_image), object_class
 
