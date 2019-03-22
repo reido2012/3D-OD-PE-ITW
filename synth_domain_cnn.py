@@ -153,7 +153,7 @@ def tfrecord_parser(serialized_example):
 
     negative_depth_image_raw = tf.read_file(depth_paths[random_index])
     negative_depth_image = tf.image.decode_png(negative_depth_image_raw, channels=3)
-    negative_depth_image = tf.image.resize_images(negative_depth_image, (224, 224, 3))
+    # pos_depth_image = tf.reshape(pos_depth_image, (IMAGE_SIZE, IMAGE_SIZE, 3))
 
     return (rgb_image, pos_depth_image, negative_depth_image), object_class
 
