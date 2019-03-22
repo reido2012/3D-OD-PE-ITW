@@ -76,7 +76,6 @@ def get_resnet_descriptors(depth_image, is_training):
     with slim.arg_scope(resnet_v1.resnet_arg_scope()):
         # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
         network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=is_training)
-        depth_image = tf.reshape(depth_image, (224, 224, 3))
         image_descriptors, endpoints = network_fn(depth_image)
 
         return image_descriptors
