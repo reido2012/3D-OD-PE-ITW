@@ -1,10 +1,7 @@
 import tensorflow as tf
-import numpy as np
 import click
-import glob
 
 from nets import nets_factory, resnet_v1
-from model_utils import ImportGraph
 
 slim = tf.contrib.slim
 tf.logging.set_verbosity(tf.logging.INFO)
