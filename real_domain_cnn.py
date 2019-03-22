@@ -72,7 +72,7 @@ def real_domain_cnn_model_fn(features, labels, mode):
         checkpoint_path = tf.train.latest_checkpoint(MODEL_DIR)
     else:
         checkpoint_path = RESNET_V1_CHECKPOINT_DIR 
-        variables_to_restore = [v  for v in variables_to_restore if 'resnet_v1_50/' in v.name]
+        variables_to_restore = [v for v in variables_to_restore if 'resnet_v1_50/' in v.name]
     
     tf.train.init_from_checkpoint(checkpoint_path, {v.name.split(':')[0]: v for v in variables_to_restore})
 
