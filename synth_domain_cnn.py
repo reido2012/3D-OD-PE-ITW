@@ -1,6 +1,6 @@
 import tensorflow as tf
 import click
-
+import glob
 from nets import nets_factory, resnet_v1
 
 slim = tf.contrib.slim
@@ -134,8 +134,10 @@ def tfrecord_parser(serialized_example):
     pos_depth_path = synth_base + data_id + slash + obj_id + under + cad_index + tf.constant("_0001.png", dtype=tf.string)
     pos_depth_path = tf.Print(pos_depth_path, [pos_depth_path])
     # Take a random depth image from this path that isn't the correct cad index
-    all_depths = synth_base + data_id + slash + obj_id + tf.constant("_*_0001.png", dtype=tf.string)
-    depth_paths = tf.gfile.Glob(all_depths)
+    # all_depths = synth_base + data_id + slash + obj_id + tf.constant("_*_0001.png", dtype=tf.string)
+    all_depths = "/home/omarreid/selerio/datasets/synth_renderings/" + data_id + "/" + obj_id + "_*_0001.png"
+    depth_paths = glob.glob(all_depths)
+    # depth_paths = tf.gfile.Glob(all_depths)
     depth_paths.remove(pos_depth_path)
     random_index = tf.random.uniform([1], 0, len(depth_paths) - 1, dtype=tf.int64)
 
