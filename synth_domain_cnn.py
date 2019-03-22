@@ -155,7 +155,7 @@ def tfrecord_parser(serialized_example):
     negative_depth_image_raw = tf.read_file(depth_paths[random_index])
     negative_depth_image = tf.image.decode_image(negative_depth_image_raw)
 
-    return (rgb_image, pos_depth_image, negative_depth_image), None
+    return (rgb_image, pos_depth_image, negative_depth_image)
 
 
 def convert_string_to_image(image_string):
@@ -204,8 +204,8 @@ def train_input_fn():
     dataset = dataset.repeat(count=10)  # Train for count epochs
 
     iterator = dataset.make_one_shot_iterator()
-    features, _ = iterator.get_next()
-    return features, _
+    features = iterator.get_next()
+    return features
 
 def eval_input_fn():
     """
@@ -216,7 +216,7 @@ def eval_input_fn():
 
     iterator = dataset.make_one_shot_iterator()
     features, labels = iterator.get_next()
-    return features, labels
+    return features
 
 
 @click.command()
