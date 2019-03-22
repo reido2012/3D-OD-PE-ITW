@@ -106,7 +106,7 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
 
                 virtual_control_points_pred = np.array(model_output[:16]).reshape(8,2)*224
                 reprojected_virtual_control_points = reprojected_virtual_control_points*224
-                virtual_control_points =  np.array(ground_truth_output[:16]).reshape(8,2)*224
+                virtual_control_points = np.array(ground_truth_output[:16]).reshape(8,2)*224
 
                 line_boxes(ax, virtual_control_points, 'r')
                 line_boxes(ax2, virtual_control_points_pred, 'b')
@@ -158,6 +158,7 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
     print(str(math.degrees(median_error)))
 
     return str(acc_pi_over_6), math.degrees(median_error)
+
 
 def get_single_examples_from_batch(all_model_predictions):
     single_examples = []
@@ -217,7 +218,7 @@ def get_predicted_3d_pose(output_vector, focal, ground_truth_output):
     focal_length = 1 #Should be 1
     image_center = (0.5, 0.5)
     dist_coeffs = np.zeros(4) # Assuming no lens distortion
-    camera_matrix = np.array([[ focal_length, 0, image_center[0]], [0, focal_length, image_center[1]], [0, 0, 1]])
+    camera_matrix = np.array([[focal_length, 0, image_center[0]], [0, focal_length, image_center[1]], [0, 0, 1]])
     
     virtual_control_points_2d[:, 1] = 1 - virtual_control_points_2d[:, 1] 
     N, M = virtual_control_points_2d.shape
@@ -228,7 +229,7 @@ def get_predicted_3d_pose(output_vector, focal, ground_truth_output):
 
     #computes projections of 3D points to the image plane 
     projected_cube = cv2.projectPoints(scaled_unit_cube, rotation_vector, translation_vector,camera_matrix, None, aspectRatio=aspect_ratio)[0]
-    reprojected_vc_points = projected_cube.reshape(8,2)
+    reprojected_vc_points = projected_cube.reshape(8, 2)
 
     #print("Reprojected VC Points")
     #print(reprojected_vc_points)
@@ -321,10 +322,6 @@ def real_domain_cnn_model_fn_predict(features, labels, mode):
 
     if mode == tf.estimator.ModeKeys.PREDICT:
         return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
-
-
-
-
 
 
 if __name__ == "__main__":
