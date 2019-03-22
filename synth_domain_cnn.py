@@ -116,7 +116,7 @@ def tfrecord_parser(serialized_example):
             'object_class': tf.FixedLenFeature([], tf.string),
             'object_index': tf.FixedLenFeature([], tf.string),
             'data_id': tf.FixedLenFeature([], tf.string),
-            'cad_index': tf.FixedLenFeature([], tf.int64),
+            'cad_index': tf.FixedLenFeature([], tf.string),
         }
     )
 
@@ -132,7 +132,7 @@ def tfrecord_parser(serialized_example):
     under = tf.constant("_", dtype=tf.string)
 
     pos_depth_path = synth_base + data_id + slash + obj_id + under + cad_index + tf.constant("_0001.png", dtype=tf.string)
-
+    pos_depth_path = tf.print(pos_depth_path)
     # Take a random depth image from this path that isn't the correct cad index
     all_depths = synth_base + data_id + slash + obj_id + tf.constant("_*_0001.png", dtype=tf.string)
     depth_paths = tf.gfile.Glob(all_depths)
