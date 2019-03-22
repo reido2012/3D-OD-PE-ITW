@@ -124,6 +124,7 @@ def tfrecord_parser(serialized_example):
     pos_depth_image = convert_string_to_image(features['pos_depth'])
     data_id = features['data_id']
     obj_id = features['object_index']
+    object_class = features['object_class']
     cad_index = features['cad_index']
 
     # Create Path to Folder Containing Negative Example Depth Image
@@ -155,7 +156,7 @@ def tfrecord_parser(serialized_example):
     negative_depth_image_raw = tf.read_file(depth_paths[random_index])
     negative_depth_image = tf.image.decode_image(negative_depth_image_raw)
 
-    return (rgb_image, pos_depth_image, negative_depth_image)
+    return (rgb_image, pos_depth_image, negative_depth_image), object_class
 
 
 def convert_string_to_image(image_string):
@@ -204,8 +205,9 @@ def train_input_fn():
     dataset = dataset.repeat(count=10)  # Train for count epochs
 
     iterator = dataset.make_one_shot_iterator()
-    features = iterator.get_next()
-    return features
+    features, labels = iterator.get_next()
+    return features, labels
+
 
 def eval_input_fn():
     """
@@ -216,7 +218,7 @@ def eval_input_fn():
 
     iterator = dataset.make_one_shot_iterator()
     features, labels = iterator.get_next()
-    return features
+    return features, labels
 
 
 @click.command()
