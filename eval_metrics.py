@@ -97,8 +97,8 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
             if generate_imgs:
                 fig = plt.figure(figsize=(15,15))
                 ax = plt.subplot(1, 3, 1)
-                ax2 = plt.subplot(1,3,2)
-                ax3 = plt.subplot(1,3,3)
+                ax2 = plt.subplot(1, 3, 2)
+                ax3 = plt.subplot(1, 3, 3)
                 
                 ax.imshow(image)
                 ax2.imshow(image)
