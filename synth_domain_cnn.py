@@ -143,7 +143,7 @@ def tfrecord_parser(serialized_example):
     # depth_paths = tf.gfile.Glob(all_depths)
     # depth_paths.remove(pos_depth_path)
 
-    random_index = tf.random_uniform([1], 0, tf.size(depth_paths), dtype=tf.int64)
+    random_index = tf.random_uniform([1], 0, tf.size(depth_paths), dtype=tf.int32)
 
     negative_depth_image_raw = tf.read_file(depth_paths[random_index])
     negative_depth_image = tf.image.decode_image(negative_depth_image_raw)
