@@ -22,7 +22,7 @@ PRETRAINED_MODEL_DIR = "home/omarreid/selerio/final_year_project/models/test_one
 RESNET_V1_CHECKPOINT_DIR = "/home/omarreid/selerio/datasets/pre_trained_weights/resnet_v1_50.ckpt"
 
 
-def synth_domain_cnn_model_fn(features, mode):
+def synth_domain_cnn_model_fn(features, labels, mode):
     rgb_images, positive_depth_images, negative_depth_images = features
 
     positive_depth_descriptors = get_resnet_descriptors(positive_depth_images, is_training=True)
