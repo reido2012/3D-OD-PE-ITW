@@ -125,7 +125,10 @@ def tfrecord_parser(serialized_example):
     rgb_image = tf.to_float(rgb_image)
     rgb_image = tf.reshape(rgb_image, (IMAGE_SIZE, IMAGE_SIZE, 3))
 
-    pos_depth_image = convert_string_to_image(features['pos_depth'])
+    pos_depth_image = tf.decode_raw(features['pos_depth'], tf.uint8)
+    pos_depth_image = tf.to_float(pos_depth_image)
+    pos_depth_image = tf.reshape(pos_depth_image, (IMAGE_SIZE, IMAGE_SIZE, 3))
+
     data_id = features['data_id']
     obj_id = features['object_index']
     object_class = features['object_class']
@@ -149,8 +152,8 @@ def tfrecord_parser(serialized_example):
     depth_paths = tf.Print(depth_paths, [depth_paths], message="Depth Paths: ")
 
     negative_depth_image_raw = tf.read_file(depth_paths[random_index])
-    negative_depth_image = tf.image.decode_image(negative_depth_image_raw, 3)
-
+    negative_depth_image = tf.image.decode_png(negative_depth_image_raw, channels=3)
+    negative_depth_image = tf.image.resize_images(negative_depth_image, (224, 224, 3))
 
     return (rgb_image, pos_depth_image, negative_depth_image), object_class
 
