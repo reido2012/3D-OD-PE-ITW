@@ -120,7 +120,7 @@ def tfrecord_parser(serialized_example):
         }
     )
 
-    rgb_image = convert_string_to_image(features['object_image'])
+    rgb_image = convert_string_to_image(features['rgb_image'])
     pos_depth_image = convert_string_to_image(features['pos_depth'])
     data_id = features['data_id']
     obj_id = features['object_index']
@@ -130,6 +130,7 @@ def tfrecord_parser(serialized_example):
     pos_depth_path = "/home/omarreid/selerio/datasets/synth_renderings/" + data_id + "/" + obj_id + "_" + cad_index + \
                      "_0001.png"
 
+    # Take a random depth image from this path that isn't the correct cad index
     all_depths = "/home/omarreid/selerio/datasets/synth_renderings/" + data_id + "/" + obj_id + "_*_0001.png"
     depth_paths = tf.gfile.Glob(all_depths)
     depth_paths.remove(pos_depth_path)
@@ -137,8 +138,6 @@ def tfrecord_parser(serialized_example):
 
     negative_depth_image_raw = tf.read_file(depth_paths[random_index])
     negative_depth_image = tf.image.decode_image(negative_depth_image_raw)
-
-    # Take a random depth image from this path that isn't the correct cad index
 
     return (rgb_image, pos_depth_image, negative_depth_image)
 
