@@ -135,7 +135,8 @@ def tfrecord_parser(serialized_example):
     pos_depth_path = tf.Print(pos_depth_path, [pos_depth_path])
     # Take a random depth image from this path that isn't the correct cad index
     all_depths = synth_base + data_id + slash + obj_id + tf.constant("_*_0001.png", dtype=tf.string)
-    depth_paths = tf.gfile.Glob(all_depths)
+    # depth_paths = tf.gfile.Glob(all_depths)
+    depth_paths = tf.map_fn(tf.gfile.Glob, all_depths)
     depth_paths.remove(pos_depth_path)
     random_index = tf.random.uniform([1], 0, len(depth_paths) - 1, dtype=tf.int64)
 
