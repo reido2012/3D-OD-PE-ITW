@@ -136,12 +136,12 @@ def tfrecord_parser(serialized_example):
     # Take a random depth image from this path that isn't the correct cad index
     # all_depths = synth_base + data_id + slash + obj_id + tf.constant("_*_0001.png", dtype=tf.string)
     all_depths = "/home/omarreid/selerio/datasets/synth_renderings/" + data_id + "/" + obj_id + "_*_0001.png"
-    filename_queue = tf.train.string_input_producer(tf.train.match_filenames_once(all_depths))
+    depth_paths = tf.train.match_filenames_once(all_depths)
     # depth_paths = tf.gfile.Glob(all_depths)
-    filename_queue.remove(pos_depth_path)
-    random_index = tf.random.uniform([1], 0, len(filename_queue) - 1, dtype=tf.int64)
+    depth_paths.remove(pos_depth_path)
+    random_index = tf.random.uniform([1], 0, len(depth_paths) - 1, dtype=tf.int64)
 
-    negative_depth_image_raw = tf.read_file(filename_queue[random_index])
+    negative_depth_image_raw = tf.read_file(depth_paths[random_index])
     negative_depth_image = tf.image.decode_image(negative_depth_image_raw)
 
     return (rgb_image, pos_depth_image, negative_depth_image)
