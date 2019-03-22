@@ -143,7 +143,7 @@ def tfrecord_parser(serialized_example):
     # depth_paths = tf.gfile.Glob(all_depths)
     # depth_paths.remove(pos_depth_path)
 
-    random_index = tf.random_uniform([1], 0, tf.size(depth_paths), dtype=tf.int32)
+    random_index = tf.random_uniform([], 0, tf.size(depth_paths), dtype=tf.int32)
     print(tf.size(depth_paths))
     print(random_index)
     depth_paths = tf.Print(random_index, [random_index])
