@@ -80,6 +80,12 @@ def synth_domain_cnn_model_fn(features, labels, mode):
 
         return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
 
+    # Add evaluation metrics (for EVAL mode)
+    if mode == tf.estimator.ModeKeys.EVAL:
+        eval_metric_ops = {
+        }
+        return tf.estimator.EstimatorSpec(mode=mode, loss=loss, eval_metric_ops=eval_metric_ops)
+
 
 def get_pretrained_resnet_descriptors(depth_image, is_training):
     with slim.arg_scope(resnet_v1.resnet_arg_scope()):
