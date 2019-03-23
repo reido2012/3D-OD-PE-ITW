@@ -127,17 +127,8 @@ def tfrecord_parser(serialized_example):
         }
     )
 
-    # rgb_image = convert_string_to_image(features['rgb_image'])
-    # rgb_image = tf.decode_raw(features['rgb_image'], tf.uint8)
-    # rgb_image = tf.to_float(rgb_image)
-    # rgb_image = tf.reshape(rgb_image, (IMAGE_SIZE, IMAGE_SIZE, 3))
-
     rgb_image = convert_string_to_image(features['object_image'])
     pos_depth_image = convert_string_to_image(features['positive_depth_image'])
-
-    # pos_depth_image = tf.decode_raw(features['pos_depth'], tf.uint8)
-    # pos_depth_image = tf.to_float(pos_depth_image)
-    # pos_depth_image = tf.reshape(pos_depth_image, (IMAGE_SIZE, IMAGE_SIZE, 3))
 
     data_id = features['data_id']
     obj_id = features['object_index']
@@ -246,9 +237,6 @@ def main(model_dir):
         eval_spec = tf.estimator.EvalSpec(input_fn=eval_input_fn)
 
         tf.estimator.train_and_evaluate(real_domain_cnn, train_spec, eval_spec)
-
-        # acc_pi_6, med_error = run_eval(model_dir)
-        # logging.debug("ACC PI/6: " + acc_pi_6 + " | Med Error: " + str(med_error) + " | Epochs Elapsed: " + str(40))
 
 
 if __name__ == "__main__":
