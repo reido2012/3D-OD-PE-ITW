@@ -25,22 +25,23 @@ RESNET_V1_CHECKPOINT_DIR = "/home/omarreid/selerio/datasets/pre_trained_weights/
 def synth_domain_cnn_model_fn(features, labels, mode):
     rgb_images, positive_depth_images, negative_depth_images = features
 
-    with slim.arg_scope(['synth_domain']):
-        # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
-        network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=True)
-        positive_depth_descriptors, endpoints = network_fn(positive_depth_images)
-        negative_depth_descriptors, endpoints = network_fn(negative_depth_images)
+    with tf.variable_scope('synth_domain'):
+        with slim.arg_scope(resnet_v1.resnet_arg_scope()):
+            # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
+            network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=True)
+            positive_depth_descriptors, endpoints = network_fn(positive_depth_images)
+            negative_depth_descriptors, endpoints = network_fn(negative_depth_images)
 
     rgb_descriptors = get_pretrained_resnet_descriptors(rgb_images, is_training=True)
 
     # Get variables to store for real domain CNN
-    real_domain_variables_to_restore = slim.get_variables_to_restore('real_domain')
+    real_domain_variables_to_restore = slim.get_variables_to_restore(include=['real_domain'], exclude=['synth_domain'])
     print("Real Domain Variables To Restore: ")
     print(real_domain_variables_to_restore)
     checkpoint_path = tf.train.latest_checkpoint(PRETRAINED_MODEL_DIR)
-    tf.train.init_from_checkpoint(checkpoint_path, {v.name.split(':')[0]: v for v in real_domain_variables_to_restore if 'real_domain/' in v.name})
+    tf.train.init_from_checkpoint(checkpoint_path, {v.name.split(':')[0]: v for v in real_domain_variables_to_restore if 'real_domain/' in v.name and 'synth_domain/' not in v.name})
 
-    variables_to_restore = slim.get_variables_to_restore('synth_domain')
+    variables_to_restore = slim.get_variables_to_restore(include=['synth_domain'], exclude=['real_domain'])
     print("New Synth Variables")
     print(variables_to_restore)
 
@@ -48,7 +49,7 @@ def synth_domain_cnn_model_fn(features, labels, mode):
         checkpoint_path = tf.train.latest_checkpoint(MODEL_DIR)
     else:
         checkpoint_path = RESNET_V1_CHECKPOINT_DIR
-        variables_to_restore = [v for v in variables_to_restore if 'resnet_v1_50/' in v.name and 'real_domain/' not in v.name]
+        variables_to_restore = [v for v in variables_to_restore if 'resnet_v1_50/' in v.name and 'real_domain/' not in v.name and 'synth_domain/' in v.name]
 
     tf.train.init_from_checkpoint(checkpoint_path, {v.name.split(':')[0]: v for v in variables_to_restore})
 
@@ -89,11 +90,12 @@ def synth_domain_cnn_model_fn(features, labels, mode):
 #         return image_descriptors
 
 def get_pretrained_resnet_descriptors(depth_image, is_training):
-    with slim.arg_scope(['real_domain']):
-        # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
-        network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=is_training)
-        image_descriptors, endpoints = network_fn(depth_image)
-        return image_descriptors
+    with tf.variable_scope('real_domain'):
+        with slim.arg_scope(resnet_v1.resnet_arg_scope()):
+            # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
+            network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=is_training)
+            image_descriptors, endpoints = network_fn(depth_image)
+            return image_descriptors
 
 
 def similarity_loss(rgb_descriptor, pos_descriptor, neg_descriptor):
