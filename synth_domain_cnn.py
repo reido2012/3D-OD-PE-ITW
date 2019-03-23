@@ -30,8 +30,6 @@ def synth_domain_cnn_model_fn(features, labels, mode):
 
     # Get variables to store for real domain CNN
     real_domain_variables_to_restore = slim.get_variables_to_restore(exclude=['synth_domain'])
-    print("Real Domain Variables To Restore: ")
-    print(real_domain_variables_to_restore)
     checkpoint_path = tf.train.latest_checkpoint(PRETRAINED_MODEL_DIR)
     tf.train.init_from_checkpoint(checkpoint_path, {v.name.split(':')[0]: v for v in real_domain_variables_to_restore})
 
