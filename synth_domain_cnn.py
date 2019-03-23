@@ -40,7 +40,7 @@ def synth_domain_cnn_model_fn(features, labels, mode):
     print("Real Domain Variables To Restore: ")
     print(real_domain_variables_to_restore)
     checkpoint_path = tf.train.latest_checkpoint(PRETRAINED_MODEL_DIR)
-    tf.train.init_from_checkpoint(checkpoint_path, {v.name.split(':')[0]: v for v in real_domain_variables_to_restore if 'real_domain/' in v.name and 'synth_domain/' not in v.name})
+    tf.train.init_from_checkpoint(checkpoint_path, {'real_domain/' + v.name.split(':')[0]: v for v in real_domain_variables_to_restore if 'real_domain/' in v.name and 'synth_domain/' not in v.name})
 
     variables_to_restore = slim.get_variables_to_restore(include=['synth_domain'], exclude=['real_domain'])
     print("New Synth Variables")
@@ -52,7 +52,7 @@ def synth_domain_cnn_model_fn(features, labels, mode):
         checkpoint_path = RESNET_V1_CHECKPOINT_DIR
         variables_to_restore = [v for v in variables_to_restore if 'resnet_v1_50/' in v.name and 'real_domain/' not in v.name and 'synth_domain/' in v.name]
 
-    tf.train.init_from_checkpoint(checkpoint_path, {v.name.split(':')[0]: v for v in variables_to_restore})
+    tf.train.init_from_checkpoint(checkpoint_path, {'synth_domain/' + v.name.split(':')[0]: v for v in variables_to_restore})
 
     loss = similarity_loss(rgb_descriptors, positive_depth_descriptors, negative_depth_descriptors)
 
