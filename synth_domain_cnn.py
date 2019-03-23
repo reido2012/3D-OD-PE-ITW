@@ -47,11 +47,12 @@ def synth_domain_cnn_model_fn(features, labels, mode):
 
     if tf.gfile.IsDirectory(MODEL_DIR):
         checkpoint_path = tf.train.latest_checkpoint(MODEL_DIR)
+        variables_to_restore = [v for v in variables_to_restore if 'resnet_v1_50/' in v.name]
+        tf.train.init_from_checkpoint(checkpoint_path, {v.name.split(':')[0]: v.name.split(':')[0] for v in variables_to_restore})
     else:
         checkpoint_path = RESNET_V1_CHECKPOINT_DIR
         variables_to_restore = [v for v in variables_to_restore if 'resnet_v1_50/' in v.name and 'real_domain/' not in v.name and 'synth_domain/' in v.name]
-
-    tf.train.init_from_checkpoint(checkpoint_path, {v.name.split(':')[0].replace('synth_domain/', '', 1): v.name.split(':')[0] for v in variables_to_restore})
+        tf.train.init_from_checkpoint(checkpoint_path, {v.name.split(':')[0].replace('synth_domain/', '', 1): v.name.split(':')[0] for v in variables_to_restore})
 
     loss = similarity_loss(rgb_descriptors, positive_depth_descriptors, negative_depth_descriptors)
 
