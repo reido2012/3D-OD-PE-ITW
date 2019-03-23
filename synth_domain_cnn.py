@@ -36,7 +36,7 @@ def synth_domain_cnn_model_fn(features, labels, mode):
     rgb_descriptors = get_pretrained_resnet_descriptors(rgb_images, is_training=True)
 
     # Get variables to store for real domain CNN
-    real_domain_variables_to_restore = slim.get_variables_to_restore(include=['real_domain'], exclude=['synth_domain'])
+    real_domain_variables_to_restore = slim.get_variables_to_restore(exclude=['synth_domain'])
     print("Real Domain Variables To Restore: ")
     print(real_domain_variables_to_restore)
     checkpoint_path = tf.train.latest_checkpoint(PRETRAINED_MODEL_DIR)
