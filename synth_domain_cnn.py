@@ -137,13 +137,6 @@ def tfrecord_parser(serialized_example):
     cad_index = features['cad_index']
 
     # Create Path to Folder Containing Negative Example Depth Image
-    synth_base = tf.constant("/home/omarreid/selerio/datasets/synth_renderings/", dtype=tf.string)
-    slash = tf.constant("/", dtype=tf.string)
-    under = tf.constant("_", dtype=tf.string)
-
-    pos_depth_path = synth_base + data_id + slash + obj_id + under + cad_index + tf.constant("_0001.png", dtype=tf.string)
-    pos_depth_path = tf.Print(pos_depth_path, [pos_depth_path])
-
     all_depths = "/home/omarreid/selerio/datasets/synth_renderings/" + data_id + "/" + obj_id + "_[!" + cad_index + "]*_0001.png"
     depth_paths = tf.train.match_filenames_once(all_depths)
 
@@ -155,7 +148,8 @@ def tfrecord_parser(serialized_example):
 
     negative_depth_image_raw = tf.read_file(depth_paths[random_index])
     negative_depth_image = tf.image.decode_png(negative_depth_image_raw, channels=3)
-    # pos_depth_image = tf.reshape(pos_depth_image, (IMAGE_SIZE, IMAGE_SIZE, 3))
+    negative_depth_image = tf.cast(negative_depth_image, tf.float32)
+    negative_depth_image = tf.reshape(negative_depth_image, (IMAGE_SIZE, IMAGE_SIZE, 3))
 
     return (rgb_image, pos_depth_image, negative_depth_image), object_class
 
