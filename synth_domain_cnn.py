@@ -33,13 +33,13 @@ def synth_domain_cnn_model_fn(features, labels, mode):
     checkpoint_path = tf.train.latest_checkpoint(PRETRAINED_MODEL_DIR)
     tf.train.init_from_checkpoint(checkpoint_path, {v.name.split(':')[0]: v for v in real_domain_variables_to_restore})
 
-    with tf.variable_scope('synth_domain', reuse=tf.AUTO_REUSE):
+    with tf.variable_scope('synth_domain'):
         with slim.arg_scope(resnet_v1.resnet_arg_scope()):
             # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
             network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=True)
 
-            positive_depth_descriptors, endpoints = network_fn(positive_depth_images)
-            negative_depth_descriptors, endpoints = network_fn(negative_depth_images, reuse=True)
+            positive_depth_descriptors, endpoints = network_fn(positive_depth_images, reuse=tf.AUTO_REUSE)
+            negative_depth_descriptors, endpoints = network_fn(negative_depth_images, reuse=tf.AUTO_REUSE)
 
     variables_to_restore = slim.get_variables_to_restore(include=['synth_domain'], exclude=['real_domain'])
     print("New Synth Variables")
@@ -75,8 +75,8 @@ def synth_domain_cnn_model_fn(features, labels, mode):
         )
 
         tf.summary.image('RGB', rgb_images)
-        tf.summary.image('Pos Depth', positive_depth_images)
-        tf.summary.image('Neg Depth', negative_depth_images)
+        tf.summary.image('Pos_Depth', positive_depth_images)
+        tf.summary.image('Neg_Depth', negative_depth_images)
 
         return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
 
