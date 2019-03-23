@@ -38,10 +38,10 @@ def synth_domain_cnn_model_fn(features, labels, mode):
     with tf.variable_scope('synth_domain', reuse=tf.AUTO_REUSE):
         with slim.arg_scope(resnet_v1.resnet_arg_scope()):
             # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
-            network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=True, reuse=True)
+            network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=True)
 
             positive_depth_descriptors, endpoints = network_fn(positive_depth_images)
-            negative_depth_descriptors, endpoints = network_fn(negative_depth_images)
+            negative_depth_descriptors, endpoints = network_fn(negative_depth_images, reuse=True)
 
     variables_to_restore = slim.get_variables_to_restore(include=['synth_domain'], exclude=['real_domain'])
     print("New Synth Variables")
