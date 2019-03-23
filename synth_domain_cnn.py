@@ -145,7 +145,9 @@ def tfrecord_parser(serialized_example):
 
     reader = tf.WholeFileReader()
     key, value = reader.read(filename_queue)
+
     negative_depth_image = tf.image.decode_png(value, channels=3)
+    negative_depth_image = tf.image.convert_image_dtype(negative_depth_image, dtype=tf.float32)
     # depth_paths = tf.Print(depth_paths, [depth_paths], message="Depth Paths: ")
 
     # negative_depth_image_raw = tf.read_file(depth_paths[random_index])
