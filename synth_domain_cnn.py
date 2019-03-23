@@ -25,7 +25,6 @@ RESNET_V1_CHECKPOINT_DIR = "/home/omarreid/selerio/datasets/pre_trained_weights/
 def synth_domain_cnn_model_fn(features, labels, mode):
     rgb_images, positive_depth_images, negative_depth_images = features
 
-
     rgb_descriptors = get_pretrained_resnet_descriptors(rgb_images, is_training=True)
 
     # Get variables to store for real domain CNN
@@ -42,8 +41,6 @@ def synth_domain_cnn_model_fn(features, labels, mode):
             negative_depth_descriptors, endpoints = network_fn(negative_depth_images, reuse=tf.AUTO_REUSE)
 
     variables_to_restore = slim.get_variables_to_restore(include=['synth_domain'], exclude=['real_domain'])
-    print("New Synth Variables")
-    print(variables_to_restore)
 
     if tf.gfile.IsDirectory(MODEL_DIR):
         checkpoint_path = tf.train.latest_checkpoint(MODEL_DIR)
@@ -139,20 +136,20 @@ def tfrecord_parser(serialized_example):
     all_depths = "/home/omarreid/selerio/datasets/synth_renderings/" + data_id + "/" + obj_id + "_[!" + cad_index + "]*_0001.png"
     depth_paths = tf.train.match_filenames_once(all_depths)
 
-    # random_index = tf.random_uniform([1], 0, tf.size(depth_paths), dtype=tf.int32)
-    # random_index = tf.squeeze(random_index, 0)
-    filename_queue = tf.train.string_input_producer(depth_paths, shuffle=True)
+    random_index = tf.random_uniform([1], 0, tf.size(depth_paths), dtype=tf.int32)
+    random_index = tf.squeeze(random_index, 0)
+    # filename_queue = tf.train.string_input_producer(depth_paths, shuffle=True)
+    #
+    # reader = tf.WholeFileReader()
+    # key, value = reader.read(filename_queue)
 
-    reader = tf.WholeFileReader()
-    key, value = reader.read(filename_queue)
-
-    negative_depth_image = tf.image.decode_png(value, channels=3)
-    negative_depth_image = tf.image.convert_image_dtype(negative_depth_image, dtype=tf.float32)
+    # negative_depth_image = tf.image.decode_png(value, channels=3)
+    # negative_depth_image = tf.image.convert_image_dtype(negative_depth_image, dtype=tf.float32)
     # depth_paths = tf.Print(depth_paths, [depth_paths], message="Depth Paths: ")
 
-    # negative_depth_image_raw = tf.read_file(depth_paths[random_index])
-    # negative_depth_image = tf.image.decode_png(negative_depth_image_raw, channels=3)
-    # negative_depth_image = tf.cast(negative_depth_image, tf.float32)
+    negative_depth_image_raw = tf.read_file(depth_paths[random_index])
+    negative_depth_image = tf.image.decode_png(negative_depth_image_raw, channels=3)
+    negative_depth_image = tf.cast(negative_depth_image, tf.float32)
     negative_depth_image = tf.reshape(negative_depth_image, (IMAGE_SIZE, IMAGE_SIZE, 3))
 
     return (rgb_image, pos_depth_image, negative_depth_image), object_class
@@ -230,7 +227,7 @@ def main(model_dir):
     MODEL_DIR = model_dir
     with tf.device("/device:GPU:0"):
         # Create the Estimator
-        real_domain_cnn = tf.estimator.Estimator(
+        synth_domain_cnn = tf.estimator.Estimator(
             model_fn=synth_domain_cnn_model_fn,
             model_dir=model_dir
         )
@@ -241,7 +238,7 @@ def main(model_dir):
         train_spec = tf.estimator.TrainSpec(input_fn=train_input_fn, hooks=[logging_hook])
         eval_spec = tf.estimator.EvalSpec(input_fn=eval_input_fn)
 
-        tf.estimator.train_and_evaluate(real_domain_cnn, train_spec, eval_spec)
+        tf.estimator.train_and_evaluate(synth_domain_cnn, train_spec, eval_spec)
 
 
 if __name__ == "__main__":
