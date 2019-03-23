@@ -25,7 +25,7 @@ RESNET_V1_CHECKPOINT_DIR = "/home/omarreid/selerio/datasets/pre_trained_weights/
 def synth_domain_cnn_model_fn(features, labels, mode):
     rgb_images, positive_depth_images, negative_depth_images = features
 
-    with slim.arg_scope('synth_domain'):
+    with slim.arg_scope(['synth_domain']):
         # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
         network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=True)
         positive_depth_descriptors, endpoints = network_fn(positive_depth_images)
@@ -89,7 +89,7 @@ def synth_domain_cnn_model_fn(features, labels, mode):
 #         return image_descriptors
 
 def get_pretrained_resnet_descriptors(depth_image, is_training):
-    with slim.arg_scope('real_domain'):
+    with slim.arg_scope(['real_domain']):
         # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
         network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=is_training)
         image_descriptors, endpoints = network_fn(depth_image)
