@@ -35,13 +35,13 @@ def synth_domain_cnn_model_fn(features, labels, mode):
     checkpoint_path = tf.train.latest_checkpoint(PRETRAINED_MODEL_DIR)
     tf.train.init_from_checkpoint(checkpoint_path, {v.name.split(':')[0]: v for v in real_domain_variables_to_restore})
 
-    # with tf.variable_scope('synth_domain', reuse=tf.AUTO_REUSE):
-    with slim.arg_scope(resnet_v1.resnet_arg_scope()):
-        # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
-        network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=True, reuse=True)
+    with tf.variable_scope('synth_domain', reuse=tf.AUTO_REUSE):
+        with slim.arg_scope(resnet_v1.resnet_arg_scope()):
+            # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
+            network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=True, reuse=True)
 
-        positive_depth_descriptors, endpoints = network_fn(positive_depth_images)
-        negative_depth_descriptors, endpoints = network_fn(negative_depth_images)
+            positive_depth_descriptors, endpoints = network_fn(positive_depth_images)
+            negative_depth_descriptors, endpoints = network_fn(negative_depth_images)
 
     variables_to_restore = slim.get_variables_to_restore(include=['synth_domain'], exclude=['real_domain'])
     print("New Synth Variables")
@@ -84,12 +84,11 @@ def synth_domain_cnn_model_fn(features, labels, mode):
 
 
 def get_pretrained_resnet_descriptors(depth_image, is_training):
-    with tf.variable_scope('real_domain'):
-        with slim.arg_scope(resnet_v1.resnet_arg_scope()):
-            # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
-            network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=is_training)
-            image_descriptors, endpoints = network_fn(depth_image)
-            return image_descriptors
+    with slim.arg_scope(resnet_v1.resnet_arg_scope()):
+        # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
+        network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=is_training)
+        image_descriptors, endpoints = network_fn(depth_image)
+        return image_descriptors
 
 
 def similarity_loss(rgb_descriptor, pos_descriptor, neg_descriptor):
