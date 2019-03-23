@@ -25,10 +25,11 @@ RESNET_V1_CHECKPOINT_DIR = "/home/omarreid/selerio/datasets/pre_trained_weights/
 def synth_domain_cnn_model_fn(features, labels, mode):
     rgb_images, positive_depth_images, negative_depth_images = features
 
-    with tf.variable_scope('synth_domain'):
+    with tf.variable_scope('synth_domain', reuse=tf.AUTO_REUSE):
         with slim.arg_scope(resnet_v1.resnet_arg_scope()):
             # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
             network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=True)
+
             positive_depth_descriptors, endpoints = network_fn(positive_depth_images)
             negative_depth_descriptors, endpoints = network_fn(negative_depth_images)
 
@@ -80,14 +81,6 @@ def synth_domain_cnn_model_fn(features, labels, mode):
 
         return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
 
-
-# def get_resnet_descriptors(depth_image, is_training):
-#     with slim.arg_scope(resnet_v1.resnet_arg_scope()):
-#         # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
-#         network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=is_training)
-#         image_descriptors, endpoints = network_fn(depth_image)
-#
-#         return image_descriptors
 
 def get_pretrained_resnet_descriptors(depth_image, is_training):
     with tf.variable_scope('real_domain'):
