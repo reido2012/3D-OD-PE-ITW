@@ -119,7 +119,7 @@ def tfrecord_parser(serialized_example):
 
     # Create Path to Folder Containing Negative Example Depth Image
     all_depths = "/home/omarreid/selerio/datasets/synth_renderings/" + data_id + "/" + obj_id + "_[!" + cad_index + "]*_0001.png"
-    negative_depth_image = choose_random_image(all_depths)
+    # negative_depth_image = choose_random_image(all_depths)
 
     # random_index = tf.random_uniform([1], 0, tf.size(depth_paths), dtype=tf.int32)
     # random_index = tf.squeeze(random_index, 0)
@@ -139,30 +139,6 @@ def tfrecord_parser(serialized_example):
 
     return (rgb_image, pos_depth_image, negative_depth_image), object_class
 
-
-def choose_random_image(all_depths):
-
-    g1 = tf.Graph()
-    with g1.as_default() as g:
-
-        depth_paths = tf.train.match_filenames_once(all_depths)
-
-        random_index = tf.random_uniform([1], 0, tf.size(depth_paths), dtype=tf.int32)
-        random_index = tf.squeeze(random_index, 0)
-
-        random_image_path = depth_paths[random_index]
-        random_depth_image_raw = tf.read_file(random_image_path)
-        random_depth_image = tf.image.decode_png(random_depth_image_raw, channels=3)
-        random_depth_image = tf.cast(random_depth_image, tf.float32)
-        random_depth_image = tf.reshape(random_depth_image, (IMAGE_SIZE, IMAGE_SIZE, 3), name="random_depth_image")
-
-        with tf.Session(graph=g) as sess:
-            init_op = tf.global_variables_initializer()
-            print(tf.global_variables())
-            sess.run([init_op])
-            result = sess.run(random_depth_image)
-            print(result)
-            return result
 
 
 def convert_string_to_image(image_string):

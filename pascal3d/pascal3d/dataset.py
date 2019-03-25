@@ -41,6 +41,13 @@ IMAGENET_IMAGESET_DIR = DATASET_DIR + "/Image_sets/"
 PASCAL_IMAGESET_DIR = DATASET_DIR + "/PASCAL/VOCdevkit/VOC2012/ImageSets/Main/"
 OBJ_DIR = DATASET_DIR + "/OBJ/"
 MODEL_DIR = "/home/omarreid/selerio/final_year_project/models/test_one"
+BATCH_SIZE = 50
+SHUFFLE_BUFFER_SIZE = 18000
+NUM_CPU_CORES = 8
+PRE_FETCH_BUFFER_SIZE = 4
+IMAGE_SIZE = 224 # To match ResNet dimensions
+GREYSCALE_SIZE = tf.constant(50176)
+GREYSCALE_CHANNEL = tf.constant(1)
 
 
 class Pascal3DAnnotation(object):
@@ -528,11 +535,11 @@ class Pascal3DDataset(object):
         imagenet_train_ids, imagenet_val_ids = self._get_imagenet_ids()
 
         record_map = {
-            #"pascal_train": pascal_train_ids,
+            # "pascal_train": pascal_train_ids,
             #             "pascal_test": pascal_test_ids,
             "pascal_val": pascal_val_ids,
-            #"imagenet_train": imagenet_train_ids,
-            #"imagenet_val": imagenet_val_ids
+            # "imagenet_train": imagenet_train_ids,
+            # "imagenet_val": imagenet_val_ids
         }
 
         for name, id_list in record_map.items():
@@ -546,10 +553,10 @@ class Pascal3DDataset(object):
         imagenet_train_ids, imagenet_val_ids = self._get_imagenet_ids()
 
         record_map = {
-            #"pascal_train": pascal_train_ids,
-            #"pascal_test": pascal_test_ids,
-            #"pascal_val": pascal_val_ids,
-            #"imagenet_train": imagenet_train_ids,
+            # "pascal_train": pascal_train_ids,
+            # "pascal_test": pascal_test_ids,
+            # "pascal_val": pascal_val_ids,
+            # "imagenet_train": imagenet_train_ids,
             "imagenet_val": imagenet_val_ids
         }
 
@@ -557,11 +564,9 @@ class Pascal3DDataset(object):
             tfrecords_filename = '{}.tfrecords'.format(name)
             print("Starting: {}".format(tfrecords_filename))
             descriptor_dict = self.get_rgb_descriptors(MODEL_DIR, tfrecords_filename)
-            self._create_synth_tfrecords_from_data_ids(tfrecords_filename, descriptor_dict,  id_list, path_to_save_records, local)
+            self._create_synth_tfrecords_from_data_ids(tfrecords_filename, descriptor_dict, id_list,
+                                                       path_to_save_records, local)
             print("Finished: {}".format(tfrecords_filename))
-
-    def predict_input_fn(self, tfrecord_path):
-        pass
 
     def get_rgb_descriptors(self, model_dir, tfrecords_filename):
         real_domain_cnn = tf.estimator.Estimator(
@@ -571,7 +576,8 @@ class Pascal3DDataset(object):
         tfrecords_dir = "/home/omarreid/selerio/datasets/real_domain_tfrecords/"
         tfrecord_path = tfrecords_dir + tfrecords_filename
 
-        all_model_predictions = real_domain_cnn.predict(input_fn=lambda: self.predict_input_fn(tfrecord_path), yield_single_examples=False)
+        all_model_predictions = real_domain_cnn.predict(input_fn=lambda: self.predict_input_fn(tfrecord_path),
+                                                        yield_single_examples=False)
         all_model_predictions = self.get_single_examples_from_batch(all_model_predictions)
 
         descriptor_dict = {}
@@ -583,6 +589,70 @@ class Pascal3DDataset(object):
             descriptor_dict[(data_id, object_idx)] = image_descriptor
 
         return descriptor_dict
+
+    def dataset_base(self, dataset, shuffle=True):
+        if shuffle:
+            dataset = dataset.shuffle(buffer_size=SHUFFLE_BUFFER_SIZE)
+
+        dataset = dataset.map(map_func=self.tfrecord_parser,
+                              num_parallel_calls=NUM_CPU_CORES)  # Parallelize data transformation
+        dataset.apply(tf.contrib.data.ignore_errors())
+        dataset = dataset.batch(batch_size=BATCH_SIZE)
+        return dataset.prefetch(buffer_size=PRE_FETCH_BUFFER_SIZE)
+
+    def predict_input_fn(self, tfrecords_file):
+        dataset = tf.data.TFRecordDataset(tfrecords_file)
+        dataset = self.dataset_base(dataset, shuffle=False)
+
+        iterator = dataset.make_one_shot_iterator()
+        features, labels = iterator.get_next()
+        return features, labels
+
+    def tfrecord_parser(self, serialized_example):
+        """
+        #Parses a single tf.Example into image and label tensors.
+        """
+
+        features = tf.parse_single_example(
+            serialized_example,
+            # Defaults are not specified since both keys are required.
+            features={
+                'object_image': tf.FixedLenFeature([], tf.string),
+                'output_vector': tf.FixedLenFeature([19], tf.float32),
+                'data_id': tf.FixedLenFeature([], tf.string),
+                'object_index': tf.FixedLenFeature([], tf.int64),
+            }
+        )
+
+        # Convert Scalar String to uint8
+        input_image = tf.decode_raw(features['object_image'], tf.uint8)
+        input_image = tf.to_float(input_image)
+
+        data_id = features['data_id']
+
+        # Image is not in correct shape so
+        shape_pred = tf.cast(tf.equal(tf.size(input_image), GREYSCALE_SIZE), tf.bool)
+        image_shape = tf.cond(shape_pred, lambda: tf.stack([IMAGE_SIZE, IMAGE_SIZE, 1]),
+                              lambda: tf.stack([IMAGE_SIZE, IMAGE_SIZE, 3]))
+
+        input_image = tf.reshape(input_image, image_shape)
+
+        channel_pred = tf.cast(tf.equal(tf.shape(input_image)[2], GREYSCALE_CHANNEL), tf.bool)
+        input_image = tf.cond(channel_pred, lambda: tf.image.grayscale_to_rgb(input_image), lambda: input_image)
+        input_image = tf.reshape(input_image, (224, 224, 3))
+        normal_img = input_image
+        input_image = tf.image.per_image_standardization(input_image)
+        output_vector = tf.cast(features['output_vector'], tf.float32)
+
+        model_input = {
+            "data_id": data_id,
+            "object_index": features['object_index'],
+            "img": input_image,
+            "normal_img": normal_img,
+            "ground_truth_output": output_vector
+        }
+
+        return model_input, output_vector
 
     def get_single_examples_from_batch(self, all_model_predictions):
         single_examples = []
@@ -612,7 +682,6 @@ class Pascal3DDataset(object):
                     })
 
         return single_examples
-
 
     def real_domain_cnn_model_fn_predict(self, features, labels, mode):
         """
@@ -690,10 +759,6 @@ class Pascal3DDataset(object):
                 bbox = obj['bbox']
                 obj_id = str(obj_idx)
 
-                #if os.path.isfile("/home/omarreid/selerio/datasets/synth_renderings/" + str(data_id) + "/" + obj_id + "_" + str(
-                #cad_index) + "_0001.png"):
-                    #continue
-                
                 cropped_img, square_bbox = self._crop_object_from_img(img, bbox)
                 resized_img = scipy.misc.imresize(cropped_img, (224, 224))
                 _, bbox_3d_dims = self._get_real_domain_output_vector(cls, data['class_cads'], obj)
@@ -707,26 +772,33 @@ class Pascal3DDataset(object):
                 rotation_tuple = self.mat2euler(R_rot)[::-1]
                 cad_index = self.get_cad_number(cad_index)
 
-                positive_depth_map_image_path = self.render_for_dataset(cls, cad_index, rotation_tuple, bbox_3d_dims, data_id, obj_id,
-                                                                        OBJ_DIR, local=local)
+                positive_depth_map_image_path, negative_depth_paths = self.render_for_dataset(cls, cad_index,
+                                                                                             rotation_tuple,
+                                                                                             bbox_3d_dims, data_id,
+                                                                                             obj_id, OBJ_DIR,
+                                                                                             local=local)
 
                 print("PD Image Path: " + positive_depth_map_image_path)
                 positive_depth_image = scipy.misc.imread(positive_depth_map_image_path)
 
+                negative_depth_images = list(map(scipy.misc.imread, negative_depth_paths))
                 rgb_descriptor = descriptor_dict[(data_id, obj_id)]
 
                 self._write_synth_record(writer, resized_img, rgb_descriptor, positive_depth_image, cad_index, cls,
-                                         data_id, obj_id)
+                                         data_id, obj_id, negative_depth_images)
         writer.close()
 
     def _write_synth_record(self, record_writer, image, rgb_descriptor, positive_depth_map_image, cad_index,
-                            object_class, data_id, object_index):
+                            object_class, data_id, object_index, negative_depth_images):
+
+        negative_depth_imgs_raw = map(lambda x: x.tostring(), negative_depth_images)
         img_raw = image.tostring()
         depth_img_raw = positive_depth_map_image.tostring()
 
         feature = {
             'object_image': self._bytes_feature(img_raw),
             'positive_depth_image': self._bytes_feature(depth_img_raw),
+            'negative_depth_images': self._bytes_list_feature(negative_depth_imgs_raw),
             'rgb_descriptor': self._bytes_feature(rgb_descriptor),
             'object_class': self._bytes_feature(object_class.encode('utf-8')),
             'object_index': self._bytes_feature(object_index.encode('utf-8')),
@@ -745,15 +817,21 @@ class Pascal3DDataset(object):
         else:
             return str(index)
 
-    def render_for_dataset(self, image_class, cad_index, rotation_xyz, bbox_dims, record_id, obj_id, path_to_objs, local=False):
+    def render_for_dataset(self, image_class, cad_index, rotation_xyz, bbox_dims, record_id, obj_id, path_to_objs,
+                           local=False):
         x_rotation, y_rotation, z_rotation = rotation_xyz
         x_dim, y_dim, z_dim = bbox_dims
+        negative_depth_paths = []
 
         for object_path in glob.glob(path_to_objs + image_class + "/*.obj"):
 
             curr_obj_cad_index = object_path.split("/")[-1].split(".")[0]
-             
-            if os.path.isfile("/home/omarreid/selerio/datasets/synth_renderings/" + str(record_id) + "/" + obj_id + "_" + str(curr_obj_cad_index) + "_0001.png"):
+            depth_path = "/home/omarreid/selerio/datasets/synth_renderings/" + str(
+                record_id) + "/" + obj_id + "_" + str(curr_obj_cad_index) + "_0001.png"
+
+            if os.path.isfile(depth_path):
+                if cad_index != curr_obj_cad_index:
+                    negative_depth_paths.append(depth_path)
                 continue
 
             command = "nvidia-docker run -v /home/omarreid/selerio/:/workdir peterlauri/blender-python:latest blender " \
@@ -763,7 +841,9 @@ class Pascal3DDataset(object):
                 z_rotation) + " --output_folder /workdir/pix3d/synth_renderings/" + str(record_id) + " "
 
             if local:
-                command = "blender -noaudio --background --python ./blender_render.py -- --specific_viewpoint=True --cad_index=" + curr_obj_cad_index + " --obj_id=" + obj_id + " --radians=True --viewpoint=" + str(
+                command = "blender -noaudio --background --python ./blender_render.py -- --specific_viewpoint=True " \
+                          "--cad_index=" + curr_obj_cad_index + " --obj_id=" + obj_id + " --radians=True " \
+                                                                                        "--viewpoint=" + str(
                     x_rotation) + "," + str(
                     y_rotation) + "," + str(
                     z_rotation) + " --bbox=" + str(
@@ -785,7 +865,7 @@ class Pascal3DDataset(object):
             print("Command: " + full_command)
 
         return "/home/omarreid/selerio/datasets/synth_renderings/" + str(record_id) + "/" + obj_id + "_" + str(
-            cad_index) + "_0001.png"
+            cad_index) + "_0001.png", negative_depth_paths
 
     def mat2euler(self, M, cy_thresh=None):
         ''' Discover Euler angle vector from 3x3 matrix '''
@@ -1140,6 +1220,9 @@ class Pascal3DDataset(object):
 
     def _floats_feature(self, value):
         return tf.train.Feature(float_list=tf.train.FloatList(value=value))
+
+    def _bytes_list_feature(self, value):
+        return tf.train.Feature(bytes_list=tf.train.BytesList(value=value))
 
     def _augment_image(self, image, original_output_vector, blur, mirror):
         """
