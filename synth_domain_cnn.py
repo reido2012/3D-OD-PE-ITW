@@ -169,8 +169,7 @@ def choose_random_image(all_depths):
         random_depth_image_raw = tf.read_file(random_image_path)
         random_depth_image = tf.image.decode_png(random_depth_image_raw, channels=3)
         random_depth_image = tf.cast(random_depth_image, tf.float32)
-        random_depth_image = tf.reshape(random_depth_image, (IMAGE_SIZE, IMAGE_SIZE, 3))
-        random_depth_image = tf.identity(random_depth_image, name="random_depth_image")
+        random_depth_image = tf.reshape(random_depth_image, (IMAGE_SIZE, IMAGE_SIZE, 3), name="random_depth_image")
 
     with tf.Session(graph=g1) as sess:
         tf.global_variables_initializer()
