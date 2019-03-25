@@ -790,7 +790,7 @@ class Pascal3DDataset(object):
     def _write_synth_record(self, record_writer, image, rgb_descriptor, positive_depth_map_image, cad_index,
                             object_class, data_id, object_index, negative_depth_images):
 
-        negative_depth_imgs_raw = map(lambda x: x.tostring(), negative_depth_images)
+        negative_depth_imgs_raw = list(map(lambda x: x.tostring(), negative_depth_images))
         img_raw = image.tostring()
         depth_img_raw = positive_depth_map_image.tostring()
 
