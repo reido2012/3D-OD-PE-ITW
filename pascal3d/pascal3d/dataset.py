@@ -657,6 +657,8 @@ class Pascal3DDataset(object):
     def get_single_examples_from_batch(self, all_model_predictions):
         single_examples = []
         for output_batch in all_model_predictions:
+            print("Output")
+            print(output_batch)
             data_ids = output_batch['data_id']
             image_descriptors = output_batch['image_descriptor']
             object_indices = output_batch['object_index']
@@ -717,7 +719,8 @@ class Pascal3DDataset(object):
             # Generate predictions (for PREDICT and EVAL mode)
             "2d_prediction": logits,
             "image_descriptor": image_descriptors,
-            "data_id": features['data_id']
+            "data_id": features['data_id'],
+            "object_index": features['object_index']
         }
 
         if mode == tf.estimator.ModeKeys.PREDICT:
