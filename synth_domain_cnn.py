@@ -137,7 +137,7 @@ def tfrecord_parser(serialized_example):
     # negative_depth_image = tf.cast(negative_depth_image, tf.float32)
     # negative_depth_image = tf.reshape(negative_depth_image, (IMAGE_SIZE, IMAGE_SIZE, 3))
 
-    return (rgb_image, rgb_descriptor, pos_depth_image, negative_depth_image), object_class
+    return (rgb_image, pos_depth_image, negative_depth_image), object_class
 
 
 def choose_random_image(all_depths):
@@ -157,12 +157,12 @@ def choose_random_image(all_depths):
         random_depth_image = tf.reshape(random_depth_image, (IMAGE_SIZE, IMAGE_SIZE, 3), name="random_depth_image")
 
         with tf.Session(graph=g) as sess:
-            tf.global_variables_initializer()
+            init_op = tf.global_variables_initializer()
             print(tf.global_variables())
+            sess.run([init_op])
             result = sess.run(random_depth_image)
             print(result)
             return result
-
 
 
 def convert_string_to_image(image_string):

@@ -65,7 +65,7 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
         )
 
         records_within_limit_radians = 0
-        all_differences= []
+        all_differences = []
         
         #yield single examples = False useful if model_fn returns some tensors whose first dimension is not equal to the batch size.
         all_model_predictions = real_domain_cnn.predict(input_fn=lambda : predict_input_fn(tfrecords_file), yield_single_examples=False)

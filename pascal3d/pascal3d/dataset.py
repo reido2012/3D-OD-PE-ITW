@@ -560,6 +560,9 @@ class Pascal3DDataset(object):
             self._create_synth_tfrecords_from_data_ids(tfrecords_filename, descriptor_dict,  id_list, path_to_save_records, local)
             print("Finished: {}".format(tfrecords_filename))
 
+    def predict_input_fn(self, tfrecord_path):
+        pass
+
     def get_rgb_descriptors(self, model_dir, tfrecords_filename):
         real_domain_cnn = tf.estimator.Estimator(
             model_fn=self.real_domain_cnn_model_fn_predict,
@@ -568,7 +571,7 @@ class Pascal3DDataset(object):
         tfrecords_dir = "/home/omarreid/selerio/datasets/real_domain_tfrecords/"
         tfrecord_path = tfrecords_dir + tfrecords_filename
 
-        all_model_predictions = real_domain_cnn.predict(input_fn=lambda: predict_input_fn(tfrecord_path), yield_single_examples=False)
+        all_model_predictions = real_domain_cnn.predict(input_fn=lambda: self.predict_input_fn(tfrecord_path), yield_single_examples=False)
         all_model_predictions = self.get_single_examples_from_batch(all_model_predictions)
 
         descriptor_dict = {}
@@ -807,12 +810,6 @@ class Pascal3DDataset(object):
             x = 0.0
         return z, y, x
 
-
-
-
-
-
-
     def _create_tfrecords_from_data_ids(self, record_name, ids, tfrecord_directory, debug):
         """
             Creates TFRecords for a set of ids
@@ -914,8 +911,6 @@ class Pascal3DDataset(object):
 
         example = tf.train.Example(features=tf.train.Features(feature=feature))
         record_writer.write(example.SerializeToString())
-
-
 
     def _create_random_crops(self, img, bbox, virtual_control_points_2d, bbox_3d_dims, number_of_crops=4):
         x_offset = y_offset = 16
