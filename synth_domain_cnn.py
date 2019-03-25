@@ -156,7 +156,7 @@ def tfrecord_parser(serialized_example):
 
 
 def choose_random_image(all_depths):
-    tf.reset_default_graph()
+
     g1 = tf.Graph()
     with g1.as_default() as g:
 
@@ -171,8 +171,6 @@ def choose_random_image(all_depths):
         random_depth_image = tf.cast(random_depth_image, tf.float32)
         random_depth_image = tf.reshape(random_depth_image, (IMAGE_SIZE, IMAGE_SIZE, 3))
         random_depth_image = tf.identity(random_depth_image, name="random_depth_image")
-
-    tf.reset_default_graph()
 
     with tf.Session(graph=g1) as sess:
         tf.global_variables_initializer()
