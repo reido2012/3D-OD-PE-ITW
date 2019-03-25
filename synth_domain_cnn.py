@@ -174,7 +174,8 @@ def choose_random_image(all_depths):
 
     with tf.Session(graph=g1) as sess:
         tf.global_variables_initializer()
-        result = sess.run(sess.graph.get_tensor_by_name("random_depth_image"))
+        print(tf.global_variables())
+        result = sess.run(random_depth_image)
         print(result)
         return result
 
