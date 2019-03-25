@@ -156,8 +156,8 @@ def tfrecord_parser(serialized_example):
 
 
 def choose_random_image(all_depths):
+    tf.reset_default_graph()
     g1 = tf.Graph()
-
     with g1.as_default() as g:
 
         depth_paths = tf.train.match_filenames_once(all_depths)
