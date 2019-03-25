@@ -657,8 +657,6 @@ class Pascal3DDataset(object):
     def get_single_examples_from_batch(self, all_model_predictions):
         single_examples = []
         for output_batch in all_model_predictions:
-            print("Output")
-            print(output_batch)
             data_ids = output_batch['data_id']
             image_descriptors = output_batch['image_descriptor']
             object_indices = output_batch['object_index']
@@ -666,8 +664,6 @@ class Pascal3DDataset(object):
             number_in_batch = min(len(data_ids), len(object_indices), len(predictions_2d))
 
             if type(predictions_2d[0]) is not np.ndarray:
-                print("Output Batch")
-                print(output_batch)
                 single_examples.append({
                     "data_id": data_ids[0],
                     "object_index": object_indices[0],
