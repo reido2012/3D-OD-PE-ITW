@@ -172,11 +172,11 @@ def choose_random_image(all_depths):
         random_depth_image = tf.reshape(random_depth_image, (IMAGE_SIZE, IMAGE_SIZE, 3))
         random_depth_image = tf.identity(random_depth_image, name="random_depth_image")
 
-        with tf.Session(graph=g) as sess:
-            tf.initialize_all_variables()
-            result = sess.run(sess.graph.get_tensor_by_name("random_depth_image:0"))
-            print(result)
-            return result
+    with tf.Session(graph=g1) as sess:
+        tf.initialize_all_variables()
+        result = sess.run(sess.graph.get_tensor_by_name("random_depth_image:0"))
+        print(result)
+        return result
 
 
 
