@@ -781,7 +781,7 @@ class Pascal3DDataset(object):
                 positive_depth_image = scipy.misc.imread(positive_depth_map_image_path)
 
                 negative_depth_images = list(map(scipy.misc.imread, negative_depth_paths))
-                rgb_descriptor = descriptor_dict[(data_id, obj_id)]
+                rgb_descriptor = descriptor_dict[(data_id, obj_idx)]
 
                 self._write_synth_record(writer, resized_img, rgb_descriptor, positive_depth_image, cad_index, cls,
                                          data_id, obj_id, negative_depth_images)
