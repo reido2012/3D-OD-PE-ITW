@@ -791,9 +791,7 @@ class Pascal3DDataset(object):
                             object_class, data_id, object_index, negative_depth_images):
 
         negative_depth_imgs_raw = list(map(lambda x: x.tostring(), negative_depth_images))
-        print("RGB Descriptor")
-        print(rgb_descriptor)
-        print(rgb_descriptor.shape)
+        rgb_descriptor = rgb_descriptor.squeeze()
         img_raw = image.tostring()
         depth_img_raw = positive_depth_map_image.tostring()
 
