@@ -27,7 +27,6 @@ data_type = 'all'
 DATASET = pascal3d.dataset.Pascal3DDataset(data_type, dataset_path="/home/omarreid/selerio/datasets/PASCAL3D+_release1.1", generate=True)
 TFRECORDS_DIR = "/home/omarreid/selerio/datasets/real_domain_tfrecords/"
 EVAL_TFRECORDS = TFRECORDS_DIR + "pascal_val.tfrecords"
-RESNET_V1_CHECKPOINT_DIR = "/home/omarreid/selerio/datasets/pre_trained_weights/resnet_v1_50.ckpt"
 NETWORK_NAME = 'resnet_v1_50'
 MODEL_DIR = ""
 

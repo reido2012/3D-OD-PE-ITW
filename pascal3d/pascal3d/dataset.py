@@ -13,15 +13,8 @@ import glob
 import cv2
 import matplotlib
 import tensorflow as tf
-from matplotlib.collections import PatchCollection
-from matplotlib.patches import Polygon
-import matplotlib.lines as lines
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-from mpl_toolkits.mplot3d import Axes3D  # NOQA
-from itertools import product, combinations
-from tqdm import tqdm
 import numpy as np
 import PIL.Image
 import PIL.ImageDraw
@@ -31,15 +24,23 @@ import skimage.color
 import sklearn.model_selection
 import tqdm
 
+from tqdm import tqdm
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+from matplotlib.collections import PatchCollection
+from matplotlib.patches import Polygon
+from itertools import product
+from nets import nets_factory, resnet_v1
 from pascal3d import utils
 
-# UNIT_CUBE = np.array([[-0.5,0.5,-0.5],[-0.5,0.5,0.5], [-0.5, -0.5, -0.5], [-0.5, -0.5, 0.5], [0.5, 0.5, -0.5], [0.5, 0.5, 0.5], [0.5, -0.5, 0.5], [0.5, -0.5,0.5]])
-# UNIT_CUBE = np.array(list(product([-1, 1], [-1, 1], [-1, 1])))
+slim = tf.contrib.slim
+
+NETWORK_NAME = 'resnet_v1_50'
 UNIT_CUBE = np.array(list(product([-0.5, 0.5], [-0.5, 0.5], [-0.5, 0.5])))
 DATASET_DIR = osp.expanduser('/home/omarreid/selerio/datasets/PASCAL3D+_release1.1')
 IMAGENET_IMAGESET_DIR = DATASET_DIR + "/Image_sets/"
 PASCAL_IMAGESET_DIR = DATASET_DIR + "/PASCAL/VOCdevkit/VOC2012/ImageSets/Main/"
 OBJ_DIR = DATASET_DIR + "/OBJ/"
+MODEL_DIR = "/home/omarreid/selerio/final_year_project/models/test_one"
 
 
 class Pascal3DAnnotation(object):
@@ -555,22 +556,102 @@ class Pascal3DDataset(object):
         for name, id_list in record_map.items():
             tfrecords_filename = '{}.tfrecords'.format(name)
             print("Starting: {}".format(tfrecords_filename))
-            self._create_synth_tfrecords_from_data_ids(tfrecords_filename, id_list, path_to_save_records, local)
+            descriptor_dict = self.get_rgb_descriptors(MODEL_DIR, tfrecords_filename)
+            self._create_synth_tfrecords_from_data_ids(tfrecords_filename, descriptor_dict,  id_list, path_to_save_records, local)
             print("Finished: {}".format(tfrecords_filename))
 
-    def _set_image_operations(self, img):
-        height, width, _ = img.shape
+    def get_rgb_descriptors(self, model_dir, tfrecords_filename):
+        real_domain_cnn = tf.estimator.Estimator(
+            model_fn=self.real_domain_cnn_model_fn_predict,
+            model_dir=model_dir
+        )
+        tfrecords_dir = "/home/omarreid/selerio/datasets/real_domain_tfrecords/"
+        tfrecord_path = tfrecords_dir + tfrecords_filename
 
-        if max(height, width) > 224:
-            apply_blur = 1
-            apply_random_crops = True
-        else:
-            apply_blur = 0
-            apply_random_crops = False
+        all_model_predictions = real_domain_cnn.predict(input_fn=lambda: predict_input_fn(tfrecord_path), yield_single_examples=False)
+        all_model_predictions = self.get_single_examples_from_batch(all_model_predictions)
 
-        return apply_blur, apply_random_crops
+        descriptor_dict = {}
+        for counter, model_prediction in enumerate(all_model_predictions):
+            image_descriptor = model_prediction["image_descriptor"]
+            data_id = model_prediction["data_id"].decode('utf-8')
+            object_idx = model_prediction["object_index"].decode('utf-8')
 
-    def _create_synth_tfrecords_from_data_ids(self, record_name, ids, path_to_save_records, local):
+            descriptor_dict[(data_id, object_idx)] = image_descriptor
+
+        return descriptor_dict
+
+    def get_single_examples_from_batch(self, all_model_predictions):
+        single_examples = []
+        for output_batch in all_model_predictions:
+            data_ids = output_batch['data_id']
+            image_descriptors = output_batch['image_descriptor']
+            object_indices = output_batch['object_index']
+            predictions_2d = output_batch['2d_prediction']
+            number_in_batch = min(len(data_ids), len(object_indices), len(predictions_2d))
+
+            if type(predictions_2d[0]) is not np.ndarray:
+                print("Output Batch")
+                print(output_batch)
+                single_examples.append({
+                    "data_id": data_ids[0],
+                    "object_index": object_indices[0],
+                    "2d_prediction": predictions_2d,
+                    "image_descriptor": image_descriptors
+                })
+            else:
+                for index in range(number_in_batch):
+                    single_examples.append({
+                        "data_id": data_ids[index],
+                        "object_index": object_indices[index],
+                        "2d_prediction": predictions_2d[index],
+                        "image_descriptor": image_descriptors[index]
+                    })
+
+        return single_examples
+
+
+    def real_domain_cnn_model_fn_predict(self, features, labels, mode):
+        """
+        Real Domain CNN from 3D Object Detection and Pose Estimation paper
+        """
+
+        # Training End to End - So weights start from scratch
+        input_images = tf.identity(features['img'], name="input")  # Used when converting to unity
+
+        with slim.arg_scope(resnet_v1.resnet_arg_scope()):
+            # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
+            network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=True)
+            image_descriptors, endpoints = network_fn(input_images)
+
+        image_descriptors = tf.identity(image_descriptors, name="image_descriptors")
+
+        # Add a dense layer to get the 19 neuron linear output layer
+        logits = tf.layers.dense(image_descriptors, 19,
+                                 kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=0.0001))
+        logits = tf.squeeze(logits, name='2d_predictions')
+
+        # Warn the user if a checkpoint exists in the train_dir. Then we'll be ignoring the checkpoint anyway.
+        if tf.train.latest_checkpoint(MODEL_DIR):
+            tf.logging.info(
+                'Ignoring RESNET50 CKPT because a checkpoint already exists in %s'
+                % MODEL_DIR)
+
+        checkpoint_path = tf.train.latest_checkpoint(MODEL_DIR)
+        variables_to_restore = slim.get_variables_to_restore()
+        tf.train.init_from_checkpoint(checkpoint_path, {v.name.split(':')[0]: v for v in variables_to_restore})
+
+        predictions = {
+            # Generate predictions (for PREDICT and EVAL mode)
+            "2d_prediction": logits,
+            "image_descriptor": image_descriptors,
+            "data_id": features['data_id']
+        }
+
+        if mode == tf.estimator.ModeKeys.PREDICT:
+            return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
+
+    def _create_synth_tfrecords_from_data_ids(self, record_name, descriptor_dict, ids, path_to_save_records, local):
         writer = tf.python_io.TFRecordWriter(path_to_save_records + record_name)
         skipped = []
         print(len(ids))
@@ -629,9 +710,29 @@ class Pascal3DDataset(object):
                 print("PD Image Path: " + positive_depth_map_image_path)
                 positive_depth_image = scipy.misc.imread(positive_depth_map_image_path)
 
-                self._write_synth_record(writer, resized_img, positive_depth_image, cad_index, cls,
+                rgb_descriptor = descriptor_dict[(data_id, obj_id)]
+
+                self._write_synth_record(writer, resized_img, rgb_descriptor, positive_depth_image, cad_index, cls,
                                          data_id, obj_id)
         writer.close()
+
+    def _write_synth_record(self, record_writer, image, rgb_descriptor, positive_depth_map_image, cad_index,
+                            object_class, data_id, object_index):
+        img_raw = image.tostring()
+        depth_img_raw = positive_depth_map_image.tostring()
+
+        feature = {
+            'object_image': self._bytes_feature(img_raw),
+            'positive_depth_image': self._bytes_feature(depth_img_raw),
+            'rgb_descriptor': self._bytes_feature(rgb_descriptor),
+            'object_class': self._bytes_feature(object_class.encode('utf-8')),
+            'object_index': self._bytes_feature(object_index.encode('utf-8')),
+            'data_id': self._bytes_feature(data_id.encode('utf-8')),
+            'cad_index': self._bytes_feature(cad_index.encode('utf-8'))
+        }
+
+        example = tf.train.Example(features=tf.train.Features(feature=feature))
+        record_writer.write(example.SerializeToString())
 
     @staticmethod
     def get_cad_number(cad_index):
@@ -706,6 +807,12 @@ class Pascal3DDataset(object):
             x = 0.0
         return z, y, x
 
+
+
+
+
+
+
     def _create_tfrecords_from_data_ids(self, record_name, ids, tfrecord_directory, debug):
         """
             Creates TFRecords for a set of ids
@@ -778,7 +885,7 @@ class Pascal3DDataset(object):
                 resized_img = scipy.misc.imresize(cropped_img, (224, 224))
 
                 # One TF Record with normal image
-                self._write_record(writer, resized_img, output_vector, False, False, False, cls, data_id, counter)
+                self._write_record(writer, resized_img, output_vector, cls, data_id, counter)
 
         writer.close()
 
@@ -793,7 +900,7 @@ class Pascal3DDataset(object):
             with open(record_name + '_skipped.txt', 'w') as file:
                 file.writelines(skipped)
 
-    def _write_record(self, record_writer, image, output_vector, apply_blur, jittered, mirrored, object_cls, data_id,
+    def _write_record(self, record_writer, image, output_vector, object_cls, data_id,
                       object_index):
         img_raw = image.tostring()
 
@@ -808,22 +915,7 @@ class Pascal3DDataset(object):
         example = tf.train.Example(features=tf.train.Features(feature=feature))
         record_writer.write(example.SerializeToString())
 
-    def _write_synth_record(self, record_writer, image, positive_depth_map_image, cad_index,
-                            object_class, data_id, object_index):
-        img_raw = image.tostring()
-        depth_img_raw = positive_depth_map_image.tostring()
 
-        feature = {
-            'object_image': self._bytes_feature(img_raw),
-            'positive_depth_image': self._bytes_feature(depth_img_raw),
-            'object_class': self._bytes_feature(object_class.encode('utf-8')),
-            'object_index': self._bytes_feature(object_index.encode('utf-8')),
-            'data_id': self._bytes_feature(data_id.encode('utf-8')),
-            'cad_index': self._bytes_feature(cad_index.encode('utf-8'))
-        }
-
-        example = tf.train.Example(features=tf.train.Features(feature=feature))
-        record_writer.write(example.SerializeToString())
 
     def _create_random_crops(self, img, bbox, virtual_control_points_2d, bbox_3d_dims, number_of_crops=4):
         x_offset = y_offset = 16
