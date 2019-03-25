@@ -584,7 +584,7 @@ class Pascal3DDataset(object):
         for counter, model_prediction in enumerate(all_model_predictions):
             image_descriptor = model_prediction["image_descriptor"]
             data_id = model_prediction["data_id"].decode('utf-8')
-            object_idx = model_prediction["object_index"].decode('utf-8')
+            object_idx = model_prediction["object_index"]
 
             descriptor_dict[(data_id, object_idx)] = image_descriptor
 
