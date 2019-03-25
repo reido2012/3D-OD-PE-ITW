@@ -134,25 +134,50 @@ def tfrecord_parser(serialized_example):
 
     # Create Path to Folder Containing Negative Example Depth Image
     all_depths = "/home/omarreid/selerio/datasets/synth_renderings/" + data_id + "/" + obj_id + "_[!" + cad_index + "]*_0001.png"
-    depth_paths = tf.train.match_filenames_once(all_depths)
+    negative_depth_image = choose_random_image(all_depths)
 
-    random_index = tf.random_uniform([1], 0, tf.size(depth_paths), dtype=tf.int32)
-    random_index = tf.squeeze(random_index, 0)
-    # filename_queue = tf.train.string_input_producer(depth_paths, shuffle=True)
+    # random_index = tf.random_uniform([1], 0, tf.size(depth_paths), dtype=tf.int32)
+    # random_index = tf.squeeze(random_index, 0)
+    # # filename_queue = tf.train.string_input_producer(depth_paths, shuffle=True)
+    # #
+    # # reader = tf.WholeFileReader()
+    # # key, value = reader.read(filename_queue)
     #
-    # reader = tf.WholeFileReader()
-    # key, value = reader.read(filename_queue)
-
-    # negative_depth_image = tf.image.decode_png(value, channels=3)
-    # negative_depth_image = tf.image.convert_image_dtype(negative_depth_image, dtype=tf.float32)
-    # depth_paths = tf.Print(depth_paths, [depth_paths], message="Depth Paths: ")
-
-    negative_depth_image_raw = tf.read_file(depth_paths[random_index])
-    negative_depth_image = tf.image.decode_png(negative_depth_image_raw, channels=3)
-    negative_depth_image = tf.cast(negative_depth_image, tf.float32)
-    negative_depth_image = tf.reshape(negative_depth_image, (IMAGE_SIZE, IMAGE_SIZE, 3))
+    # # negative_depth_image = tf.image.decode_png(value, channels=3)
+    # # negative_depth_image = tf.image.convert_image_dtype(negative_depth_image, dtype=tf.float32)
+    # # depth_paths = tf.Print(depth_paths, [depth_paths], message="Depth Paths: ")
+    #
+    # negative_depth_image_raw = tf.read_file(depth_paths[random_index])
+    # negative_depth_image = tf.image.decode_png(negative_depth_image_raw, channels=3)
+    # negative_depth_image = tf.cast(negative_depth_image, tf.float32)
+    # negative_depth_image = tf.reshape(negative_depth_image, (IMAGE_SIZE, IMAGE_SIZE, 3))
 
     return (rgb_image, pos_depth_image, negative_depth_image), object_class
+
+
+def choose_random_image(all_depths):
+    g1 = tf.Graph()
+
+    with g1.as_default() as g:
+
+        depth_paths = tf.train.match_filenames_once(all_depths)
+
+        random_index = tf.random_uniform([1], 0, tf.size(depth_paths), dtype=tf.int32)
+        random_index = tf.squeeze(random_index, 0)
+
+        random_image_path = depth_paths[random_index]
+        random_depth_image_raw = tf.read_file(random_image_path)
+        random_depth_image = tf.image.decode_png(random_depth_image_raw, channels=3)
+        random_depth_image = tf.cast(random_depth_image, tf.float32)
+        random_depth_image = tf.reshape(random_depth_image, (IMAGE_SIZE, IMAGE_SIZE, 3))
+        random_depth_image = tf.identity(random_depth_image, name="random_depth_image")
+
+        with tf.Session(graph=g) as sess:
+            tf.initialize_all_variables()
+            result = sess.run(sess.graph.get_tensor_by_name("random_depth_image:0"))
+            print(result)
+            return result
+
 
 
 def convert_string_to_image(image_string):
