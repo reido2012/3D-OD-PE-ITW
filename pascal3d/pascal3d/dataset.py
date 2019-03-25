@@ -801,7 +801,7 @@ class Pascal3DDataset(object):
             'object_image': self._bytes_feature(img_raw),
             'positive_depth_image': self._bytes_feature(depth_img_raw),
             'negative_depth_images': self._bytes_list_feature(negative_depth_imgs_raw),
-            'rgb_descriptor': self._bytes_feature(rgb_descriptor),
+            'rgb_descriptor': self._floats_feature(rgb_descriptor),
             'object_class': self._bytes_feature(object_class.encode('utf-8')),
             'object_index': self._bytes_feature(object_index.encode('utf-8')),
             'data_id': self._bytes_feature(data_id.encode('utf-8')),
