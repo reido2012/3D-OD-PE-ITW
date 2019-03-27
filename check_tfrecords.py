@@ -38,9 +38,9 @@ def main():
         ax = plt.subplot(1, 1, 1)
         ax.imshow(reconstructed_img)
 
-        plt.show()
+        plt.savefig("checkkkkkkk.png")
 
-        break
+        return
 
     for counter , (image, output_vector) in enumerate(reconstructed_records):
         fig = plt.figure()
