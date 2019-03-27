@@ -23,7 +23,7 @@ RESNET_V1_CHECKPOINT_DIR = "/home/omarreid/selerio/datasets/pre_trained_weights/
 
 
 def synth_domain_cnn_model_fn(features, labels, mode):
-    rgb_images, rgb_descriptors, positive_depth_images, negative_depth_images = features
+    rgb_descriptors, positive_depth_images, negative_depth_images = features
 
     with tf.variable_scope('synth_domain'):
         with slim.arg_scope(resnet_v1.resnet_arg_scope()):
@@ -65,9 +65,8 @@ def synth_domain_cnn_model_fn(features, labels, mode):
             global_step=global_step
         )
 
-        tf.summary.image('RGB', rgb_images)
-        tf.summary.image('Pos_Depth', positive_depth_images)
-        tf.summary.image('Neg_Depth', negative_depth_images)
+        tf.summary.image('pos_depth', positive_depth_images)
+        tf.summary.image('neg_depth', negative_depth_images)
 
         return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
 
@@ -100,45 +99,26 @@ def tfrecord_parser(serialized_example):
         serialized_example,
         # Defaults are not specified since both keys are required.
         features={
-            'object_image': tf.FixedLenFeature([], tf.string),
             'positive_depth_image': tf.FixedLenFeature([], tf.string),
-            'object_class': tf.FixedLenFeature([], tf.string),
-            'object_index': tf.FixedLenFeature([], tf.string),
-            'data_id': tf.FixedLenFeature([], tf.string),
-            'cad_index': tf.FixedLenFeature([], tf.string),
+            'rgb_descriptor': tf.FixedLenFeature([], tf.float32),
+            'negative_depth_images': tf.FixedLenFeature([], tf.string),
         }
     )
 
-    rgb_image = convert_string_to_image(features['object_image'])
     pos_depth_image = convert_string_to_image(features['positive_depth_image'])
 
-    data_id = features['data_id']
-    obj_id = features['object_index']
+    # Get random depth image
+    num_neg_depth_imgs = len(features['negative_depth_images'])
+    random_index = tf.random_uniform([1], 0, num_neg_depth_imgs, dtype=tf.int32)
+    random_index = tf.squeeze(random_index, 0)
+
+    rand_neg_depth_image_raw = features['negative_depth_images'][random_index]
+    negative_depth_image = convert_string_to_image(rand_neg_depth_image_raw)
+
     object_class = features['object_class']
-    cad_index = features['cad_index']
+    rgb_descriptor = tf.cast(features['rgb_descriptor'], tf.float32)
 
-    # Create Path to Folder Containing Negative Example Depth Image
-    all_depths = "/home/omarreid/selerio/datasets/synth_renderings/" + data_id + "/" + obj_id + "_[!" + cad_index + "]*_0001.png"
-    # negative_depth_image = choose_random_image(all_depths)
-
-    # random_index = tf.random_uniform([1], 0, tf.size(depth_paths), dtype=tf.int32)
-    # random_index = tf.squeeze(random_index, 0)
-    # # filename_queue = tf.train.string_input_producer(depth_paths, shuffle=True)
-    # #
-    # # reader = tf.WholeFileReader()
-    # # key, value = reader.read(filename_queue)
-    #
-    # # negative_depth_image = tf.image.decode_png(value, channels=3)
-    # # negative_depth_image = tf.image.convert_image_dtype(negative_depth_image, dtype=tf.float32)
-    # # depth_paths = tf.Print(depth_paths, [depth_paths], message="Depth Paths: ")
-    #
-    # negative_depth_image_raw = tf.read_file(depth_paths[random_index])
-    # negative_depth_image = tf.image.decode_png(negative_depth_image_raw, channels=3)
-    # negative_depth_image = tf.cast(negative_depth_image, tf.float32)
-    # negative_depth_image = tf.reshape(negative_depth_image, (IMAGE_SIZE, IMAGE_SIZE, 3))
-
-    return (rgb_image, pos_depth_image, negative_depth_image), object_class
-
+    return (rgb_descriptor, pos_depth_image, negative_depth_image), object_class
 
 
 def convert_string_to_image(image_string):
