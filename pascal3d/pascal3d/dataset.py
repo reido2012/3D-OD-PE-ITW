@@ -724,7 +724,6 @@ class Pascal3DDataset(object):
     def _create_synth_tfrecords_from_data_ids(self, record_name, descriptor_dict, ids, path_to_save_records, local):
         writer = tf.python_io.TFRecordWriter(path_to_save_records + record_name)
         skipped = []
-        print(len(ids))
 
         for counter, data_id in enumerate(ids):
 
@@ -789,6 +788,7 @@ class Pascal3DDataset(object):
     def _write_synth_record(self, record_writer, image, rgb_descriptor, positive_depth_map_image, cad_index,
                             object_class, data_id, object_index, negative_depth_images):
 
+        num_neg_depth_imgs = len(negative_depth_images)
         negative_depth_imgs_raw = list(map(lambda x: x.tostring(), negative_depth_images))
         rgb_descriptor = rgb_descriptor.squeeze()
         img_raw = image.tostring()
@@ -798,6 +798,7 @@ class Pascal3DDataset(object):
             'object_image': self._bytes_feature(img_raw),
             'positive_depth_image': self._bytes_feature(depth_img_raw),
             'negative_depth_images': self._bytes_list_feature(negative_depth_imgs_raw),
+            'num_negative_depth_images': self._int64_feature(num_neg_depth_imgs),
             'rgb_descriptor': self._floats_feature(rgb_descriptor),
             'object_class': self._bytes_feature(object_class.encode('utf-8')),
             'object_index': self._bytes_feature(object_index.encode('utf-8')),
