@@ -108,6 +108,7 @@ def tfrecord_parser(serialized_example):
     pos_depth_image = convert_string_to_image(features['positive_depth_image'])
 
     # Get random depth image
+    print(features['negative_depth_images'].shape)
     shuffled_depth_imgs = tf.random_shuffle(features['negative_depth_images'])
     rand_neg_depth_image_raw = shuffled_depth_imgs[0]
     negative_depth_image = convert_string_to_image(rand_neg_depth_image_raw)
