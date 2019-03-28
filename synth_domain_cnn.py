@@ -24,7 +24,7 @@ RESNET_V1_CHECKPOINT_DIR = "/home/omarreid/selerio/datasets/pre_trained_weights/
 
 def synth_domain_cnn_model_fn(features, labels, mode):
     rgb_descriptors, positive_depth_images, negative_depth_images = features
-    # negative_depth_images = negative_depth_images[:, 0, :, :, :]
+    negative_depth_images = negative_depth_images[:, 0, :, :, :]
 
     with tf.variable_scope('synth_domain'):
         with slim.arg_scope(resnet_v1.resnet_arg_scope()):
@@ -116,10 +116,10 @@ def tfrecord_parser(serialized_example):
     print(num_neg_depth_imgs)
     all_neg_imgs = tf.convert_to_tensor(all_neg_imgs, dtype=tf.string)
     shuffled_depth_imgs_raw = tf.random_shuffle(all_neg_imgs)
-    reshaped_neg_imgs = shuffled_depth_imgs_raw[0]
-    negative_depth_image = convert_string_to_image(reshaped_neg_imgs)
+    # reshaped_neg_imgs = shuffled_depth_imgs_raw[0]
+    # negative_depth_image = convert_string_to_image(reshaped_neg_imgs)
     # reshaped_neg_imgs = tf.reshape(shuffled_depth_imgs_raw, [num_neg_depth_imgs, 224, 224, 3])
-    # negative_depth_images = tf.map_fn(convert_string_to_image, reshaped_neg_imgs)
+    negative_depth_images = tf.map_fn(convert_string_to_image, shuffled_depth_imgs_raw)
     # reshaped_neg_imgs = tf.Print(negative_depth_images, [negative_depth_images])
 
     # rand_neg_depth_image_raw = reshaped_neg_imgs[0]
@@ -127,7 +127,7 @@ def tfrecord_parser(serialized_example):
     object_class = features['object_class']
     rgb_descriptor = tf.cast(features['rgb_descriptor'], tf.float32)
 
-    return (rgb_descriptor, pos_depth_image, negative_depth_image), object_class
+    return (rgb_descriptor, pos_depth_image, negative_depth_images), object_class
 
 
 def convert_string_to_image(image_string):
