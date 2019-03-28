@@ -553,10 +553,10 @@ class Pascal3DDataset(object):
         imagenet_train_ids, imagenet_val_ids = self._get_imagenet_ids()
 
         record_map = {
-            # "pascal_train": pascal_train_ids,
-            "pascal_val": pascal_val_ids,
-            "imagenet_train": imagenet_train_ids,
-            "imagenet_val": imagenet_val_ids
+            "pascal_train": pascal_train_ids,
+            # "pascal_val": pascal_val_ids,
+            # "imagenet_train": imagenet_train_ids,
+            # "imagenet_val": imagenet_val_ids
         }
 
         for name, id_list in record_map.items():
