@@ -786,7 +786,6 @@ class Pascal3DDataset(object):
                     print(f"New Neg Depth Image Dims: {negative_depth_image.shape}")
                     negative_depth_images.append(negative_depth_image)
 
-                print(f"Neg Depth Image Dims: {len(negative_depth_images)}")
                 rgb_descriptor = descriptor_dict[(data_id, obj_idx)]
 
                 self._write_synth_record(writer, resized_img, rgb_descriptor, positive_depth_image, cad_index, cls,
