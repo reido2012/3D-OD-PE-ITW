@@ -778,7 +778,15 @@ class Pascal3DDataset(object):
                 print("PD Image Path: " + positive_depth_map_image_path)
                 positive_depth_image = scipy.misc.imread(positive_depth_map_image_path)
 
-                negative_depth_images = list(map(scipy.misc.imread, negative_depth_paths))
+                negative_depth_images = []
+                for negative_depth_path in negative_depth_paths:
+                    negative_depth_image = scipy.misc.imread(negative_depth_path, mode='RGB')
+                    print(f"Original Neg Depth Image Dims: {negative_depth_image[0].shape}")
+                    negative_depth_image = scipy.misc.imresize(negative_depth_image, (224, 224, 3))
+                    print(f"New Neg Depth Image Dims: {negative_depth_image[0].shape}")
+                    negative_depth_images.append(negative_depth_image)
+
+                print(f"Neg Depth Image Dims: {len(negative_depth_images)}")
                 rgb_descriptor = descriptor_dict[(data_id, obj_idx)]
 
                 self._write_synth_record(writer, resized_img, rgb_descriptor, positive_depth_image, cad_index, cls,

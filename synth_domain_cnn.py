@@ -101,7 +101,7 @@ def tfrecord_parser(serialized_example):
         features={
             'positive_depth_image': tf.FixedLenFeature([], tf.string),
             'rgb_descriptor': tf.FixedLenFeature([], tf.float32),
-            'negative_depth_images': tf.FixedLenFeature([], tf.string),
+            'negative_depth_images': tf.FixedLenFeature([[]], tf.string),
             'num_negative_depth_images': tf.FixedLenFeature([], tf.int64)
         }
     )
@@ -112,8 +112,11 @@ def tfrecord_parser(serialized_example):
     all_neg_imgs = tf.Print(features['negative_depth_images'], [features['negative_depth_images']], "Neg Detpth Imgs")
 
     # Get random depth image
+    print("We In This Bitch")
     print(num_neg_depth_imgs)
+    print(all_neg_imgs.shape)
     # all_neg_imgs = tf.convert_to_tensor(all_neg_imgs, dtype=tf.string)
+    all_neg_imgs = tf.reshape(all_neg_imgs, [num_neg_depth_imgs, 224, 224, 3])
     print(all_neg_imgs.shape)
     shuffled_depth_imgs_raw = tf.random_shuffle(all_neg_imgs)
     reshaped_neg_img = shuffled_depth_imgs_raw[0, :, :, :]
