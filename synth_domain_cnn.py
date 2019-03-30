@@ -14,7 +14,7 @@ REG_CONSTANT = 1e-3
 MODEL_DIR = ""
 PATH_TO_RD_META = ""
 STARTING_LR = 1e-4
-TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords/"
+TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords_new/"
 TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR + "pascal_train.tfrecords",  TFRECORDS_DIR + "imagenet_val.tfrecords"]
 EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
 NETWORK_NAME = 'resnet_v1_50'
@@ -107,37 +107,16 @@ def tfrecord_parser(serialized_example):
         }
     )
 
-    pos_depth_image = convert_string_to_image(features['positive_depth_image'])
     num_neg_depth_imgs = tf.cast(features['num_negative_depth_images'], tf.int64)
-    num_neg_depth_imgs = tf.Print(num_neg_depth_imgs, [num_neg_depth_imgs], "Num Imgs:")
-    all_neg_imgs = tf.Print(features['negative_depth_images'], [features['negative_depth_images']], "Neg Detpth Imgs")
+    random_idx = tf.random_uniform([], 0, num_neg_depth_imgs, dtype=tf.int64)
+
+    neg_depth_key = "img/neg/depth/" + tf.cast(random_idx, tf.string)
+
+    negative_depth_image = convert_string_to_image(features[neg_depth_key])
+    pos_depth_image = convert_string_to_image(features['positive_depth_image'])
+
     object_class = features['object_class']
     rgb_descriptor = tf.cast(features['rgb_descriptor'], tf.float32)
-
-    # Get random depth image
-    print("We In This Bitch")
-    print(pos_depth_image)
-    print(rgb_descriptor)
-    print(num_neg_depth_imgs)
-    print(all_neg_imgs.shape)
-    # all_neg_imgs = tf.convert_to_tensor(all_neg_imgs, dtype=tf.string)
-    all_neg_imgs = tf.decode_raw(all_neg_imgs, tf.uint8)
-    all_neg_imgs = tf.stack(all_neg_imgs, axis=0)
-    all_neg_imgs = tf.convert_to_tensor(all_neg_imgs)
-    print(all_neg_imgs.shape)
-    # all_neg_imgs = tf.reshape(all_neg_imgs, [num_neg_depth_imgs, 224, 224, 3])
-    print(all_neg_imgs.shape)
-    shuffled_depth_imgs_raw = tf.random_shuffle(all_neg_imgs)
-    reshaped_neg_img = shuffled_depth_imgs_raw[0, :, :, :]
-
-    negative_depth_image = convert_string_to_image(reshaped_neg_img)
-    # reshaped_neg_imgs = tf.reshape(shuffled_depth_imgs_raw, [num_neg_depth_imgs, 224, 224, 3])
-    # negative_depth_images = tf.map_fn(convert_string_to_image, all_neg_imgs)
-    # reshaped_neg_imgs = tf.Print(negative_depth_images, [negative_depth_images])
-
-    # rand_neg_depth_image_raw = reshaped_neg_imgs[0]
-    # negative_depth_image = convert_string_to_image(rand_neg_depth_image_raw)
-
 
     return (rgb_descriptor, pos_depth_image, negative_depth_image), object_class
 
