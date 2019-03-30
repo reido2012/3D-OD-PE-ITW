@@ -554,9 +554,9 @@ class Pascal3DDataset(object):
 
         record_map = {
             "pascal_train": pascal_train_ids,
-            # "pascal_val": pascal_val_ids,
-            # "imagenet_train": imagenet_train_ids,
-            # "imagenet_val": imagenet_val_ids
+            "pascal_val": pascal_val_ids,
+            "imagenet_train": imagenet_train_ids,
+            "imagenet_val": imagenet_val_ids
         }
 
         for name, id_list in record_map.items():
@@ -805,7 +805,6 @@ class Pascal3DDataset(object):
         feature = {
             'object_image': self._bytes_feature(img_raw),
             'positive_depth_image': self._bytes_feature(depth_img_raw),
-            'negative_depth_images': self._bytes_list_feature(negative_depth_imgs_raw),
             'num_negative_depth_images': self._int64_feature(num_neg_depth_imgs),
             'rgb_descriptor': self._floats_feature(rgb_descriptor),
             'object_class': self._bytes_feature(object_class.encode('utf-8')),
@@ -813,6 +812,10 @@ class Pascal3DDataset(object):
             'data_id': self._bytes_feature(data_id.encode('utf-8')),
             'cad_index': self._bytes_feature(cad_index.encode('utf-8'))
         }
+
+        for idx, neg_raw in enumerate(negative_depth_imgs_raw):
+            key = "img/neg/depth/" + str(idx)
+            feature[key] = self._bytes_feature(neg_raw)
 
         example = tf.train.Example(features=tf.train.Features(feature=feature))
         record_writer.write(example.SerializeToString())
