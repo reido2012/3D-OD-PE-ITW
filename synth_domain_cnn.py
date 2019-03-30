@@ -125,7 +125,7 @@ def tfrecord_parser(serialized_example):
     all_neg_imgs = tf.stack(all_neg_imgs, axis=0)
     all_neg_imgs = tf.convert_to_tensor(all_neg_imgs)
     print(all_neg_imgs.shape)
-    all_neg_imgs = tf.reshape(all_neg_imgs, [num_neg_depth_imgs, 224, 224, 3])
+    # all_neg_imgs = tf.reshape(all_neg_imgs, [num_neg_depth_imgs, 224, 224, 3])
     print(all_neg_imgs.shape)
     shuffled_depth_imgs_raw = tf.random_shuffle(all_neg_imgs)
     reshaped_neg_img = shuffled_depth_imgs_raw[0, :, :, :]
