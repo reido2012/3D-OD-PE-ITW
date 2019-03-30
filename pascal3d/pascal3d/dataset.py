@@ -781,9 +781,9 @@ class Pascal3DDataset(object):
                 negative_depth_images = []
                 for negative_depth_path in negative_depth_paths:
                     negative_depth_image = scipy.misc.imread(negative_depth_path)
-                    print(f"Original Neg Depth Image Dims: {negative_depth_image[0].shape}")
+                    print(f"Original Neg Depth Image Dims: {negative_depth_image.shape}")
                     negative_depth_image = scipy.misc.imresize(negative_depth_image, (224, 224, 3))
-                    print(f"New Neg Depth Image Dims: {negative_depth_image[0].shape}")
+                    print(f"New Neg Depth Image Dims: {negative_depth_image.shape}")
                     negative_depth_images.append(negative_depth_image)
 
                 print(f"Neg Depth Image Dims: {len(negative_depth_images)}")
