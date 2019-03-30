@@ -777,29 +777,26 @@ class Pascal3DDataset(object):
 
                 print("PD Image Path: " + positive_depth_map_image_path)
                 positive_depth_image = scipy.misc.imread(positive_depth_map_image_path)
-
-                negative_depth_images = []
+                num_neg_depth_imgs = len(negative_depth_paths)
+                raw_negative_depth_images = []
                 for negative_depth_path in negative_depth_paths:
                     negative_depth_image = scipy.misc.imread(negative_depth_path, mode='RGB')
-                    print(f"Original Neg Depth Image Dims: {negative_depth_image.shape}")
                     negative_depth_image = scipy.misc.imresize(negative_depth_image, (224, 224, 3))
-                    print(f"New Neg Depth Image Dims: {negative_depth_image.shape}")
-                    negative_depth_images.append(negative_depth_image)
+                    negative_depth_image_raw = negative_depth_image.tostring()
+                    raw_negative_depth_images.append(negative_depth_image_raw)
 
                 rgb_descriptor = descriptor_dict[(data_id, obj_idx)]
 
                 self._write_synth_record(writer, resized_img, rgb_descriptor, positive_depth_image, cad_index, cls,
-                                         data_id, obj_id, negative_depth_images)
+                                         data_id, obj_id, raw_negative_depth_images, num_neg_depth_imgs)
         writer.close()
 
     def _write_synth_record(self, record_writer, image, rgb_descriptor, positive_depth_map_image, cad_index,
-                            object_class, data_id, object_index, negative_depth_images):
+                            object_class, data_id, object_index, raw_negative_depth_images, num_neg_depth_imgs):
 
-        num_neg_depth_imgs = len(negative_depth_images)
-        negative_depth_imgs_raw = list(map(lambda x: x.tostring(), negative_depth_images))
         rgb_descriptor = rgb_descriptor.squeeze()
-        img_raw = image.tostring()
         depth_img_raw = positive_depth_map_image.tostring()
+        img_raw = image.tostring()
 
         feature = {
             'object_image': self._bytes_feature(img_raw),
@@ -812,7 +809,7 @@ class Pascal3DDataset(object):
             'cad_index': self._bytes_feature(cad_index.encode('utf-8'))
         }
 
-        for idx, neg_raw in enumerate(negative_depth_imgs_raw):
+        for idx, neg_raw in enumerate(raw_negative_depth_images):
             key = "img/neg/depth/" + str(idx)
             feature[key] = self._bytes_feature(neg_raw)
 
