@@ -114,6 +114,8 @@ def tfrecord_parser(serialized_example):
     random_idx = tf.random_uniform([], 0, num_neg_depth_imgs, dtype=tf.int64)
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
+        print(num_neg_depth_imgs.eval())
+        print(random_idx.eval())
         random_idx = sess.run([random_idx, num_neg_depth_imgs])
         neg_depth_key = "img/neg/depth/" + random_idx
         sess.close()
