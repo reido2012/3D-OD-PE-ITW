@@ -170,6 +170,7 @@ def tfrecord_parser(serialized_example):
 
     # Get random depth image
     num_neg_depth_imgs = tf.cast(features['num_negative_depth_images'], tf.int64)
+    print(list(features.keys()))
     neg_depth_key = ""
     for key in list(features.keys()):
         if "img/neg/depth/" in key:
