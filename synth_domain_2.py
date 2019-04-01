@@ -43,10 +43,11 @@ class SynthDomainCNN:
         self.build_model()
 
     def initialize_dataset(self):
-        self.dataset = tf.data.Dataset.from_tensor_slices(TRAINING_TFRECORDS)
-        self.dataset = self.dataset.apply(tf.contrib.data.shuffle_and_repeat(self.batch_size * 5))
+        self.dataset = tf.data.TFRecordDataset(TRAINING_TFRECORDS)
+        self.dataset = self.dataset.map(map_func=tfrecord_parser, num_parallel_calls=NUM_CPU_CORES)
+        self.dataset = self.dataset.apply(tf.contrib.data.ignore_errors())
         self.dataset = self.dataset.batch(self.batch_size)
-        self.dataset = self.dataset.prefetch(self.batch_size * 5)
+        self.dataset = self.dataset.prefetch(5)
         self.dataset = self.dataset.make_one_shot_iterator()
         self.dataset = self.dataset.get_next()
 
