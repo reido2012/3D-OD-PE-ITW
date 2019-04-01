@@ -238,13 +238,7 @@ def main(model_dir):
     global MODEL_DIR
     MODEL_DIR = model_dir
     with tf.device("/device:GPU:0"):
-        # record_iterator = tf.python_io.tf_record_iterator(path=TRAINING_TFRECORDS)
-
-
-        # Create artificial data
-        # x_data = np.pi / 2 * np.random.normal(size=[100 * 10000, 1])
-        # y_data = np.sin(x_data)
-
+        config = tf.ConfigProto(allow_soft_placement=True)
         # Specify initial learning rate
         learning_rate = STARTING_LR
 
@@ -258,46 +252,15 @@ def main(model_dir):
         with tf.train.MonitoredTrainingSession(
                 checkpoint_dir=model_dir,
                 hooks=[tf.train.StopAtStepHook(last_step=training_steps)],
+                config=config,
                 save_summaries_steps=None,
                 save_checkpoint_steps=500) as sess:
+
             # Initialize model session
             model.set_session(sess)
 
             # Train model
             model.train()
-
-        # train_iterator = get_train_iterator()
-        #
-        #
-        # next_example, next_label = train_iterator.get_next()
-        #
-        # loss = synth_domain_cnn_model_fn(next_example, next_label)
-        #
-        # global_step = tf.train.get_global_step()
-        #
-        # learning_rate = tf.train.exponential_decay(
-        #     learning_rate=STARTING_LR,
-        #     global_step=global_step,
-        #     decay_steps=23206,
-        #     decay_rate=0.1,
-        #     staircase=True,
-        #     name="learning_rate"
-        # )
-        #
-        # optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-        #
-        # training_op = optimizer.minimize(
-        #     loss=loss,
-        #     global_step=global_step
-        # )
-        #
-        # tensors_to_log = {"loss": "loss", "learning_rate": "learning_rate", }
-        # logging_hook = tf.train.LoggingTensorHook(tensors=tensors_to_log, every_n_iter=100)
-        #
-        # with tf.train.MonitoredTrainingSession(checkpoint_dir=MODEL_DIR, hooks=[logging_hook],
-        #                                        save_checkpoint_steps=100) as sess:
-        #     while not sess.should_stop():
-        #         sess.run(training_op)
 
 
 if __name__ == "__main__":
