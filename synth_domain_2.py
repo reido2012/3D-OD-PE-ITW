@@ -165,12 +165,8 @@ def tfrecord_parser(serialized_example):
             'object_class': tf.FixedLenFeature([], tf.string)
         }
     )
-
-    example = tf.train.Example()
-    example.ParseFromString(serialized_example)
-    print(example)
-    print(tf.train.Example.FromString(example))
-
+    example_proto = tf.train.Example.FromString(serialized_example)
+    print(example_proto)
     pos_depth_image = convert_string_to_image(features['positive_depth_image'])
 
     # Get random depth image
