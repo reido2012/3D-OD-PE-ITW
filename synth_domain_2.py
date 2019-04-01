@@ -166,7 +166,10 @@ def tfrecord_parser(serialized_example):
         }
     )
 
-    print(tf.train.Example.FromString(serialized_example))
+    example = tf.train.Example()
+    example.ParseFromString(serialized_example)
+    print(example)
+    print(tf.train.Example.FromString(example))
 
     pos_depth_image = convert_string_to_image(features['positive_depth_image'])
 
