@@ -14,7 +14,7 @@ REG_CONSTANT = 1e-3
 MODEL_DIR = ""
 PATH_TO_RD_META = ""
 STARTING_LR = 1e-4
-TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords/"
+TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords_new/"
 TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR + "pascal_train.tfrecords",
                       TFRECORDS_DIR + "imagenet_val.tfrecords"]
 EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
@@ -23,77 +23,129 @@ PRETRAINED_MODEL_DIR = "/home/omarreid/selerio/final_year_project/models/test_on
 RESNET_V1_CHECKPOINT_DIR = "/home/omarreid/selerio/datasets/pre_trained_weights/resnet_v1_50.ckpt"
 
 
-def synth_domain_cnn_model_fn(features, labels):
-    rgb_descriptors, positive_depth_images, negative_depth_images = features
+class SynthDomainCNN:
 
-    with tf.variable_scope('synth_domain'):
-        with slim.arg_scope(resnet_v1.resnet_arg_scope()):
-            # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
-            network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=True)
+    def __init__(self, learning_rate, batch_size):
+        # self.x_data = x_data
+        # self.y_data = y_data
+        # self.synth_dataset = synth_ds .
+        self.learning_rate = learning_rate
+        self.batch_size = batch_size
 
-            positive_depth_descriptors, endpoints = network_fn(positive_depth_images, reuse=tf.AUTO_REUSE)
-            negative_depth_descriptors, endpoints = network_fn(negative_depth_images, reuse=tf.AUTO_REUSE)
 
-    variables_to_restore = slim.get_variables_to_restore(include=['synth_domain'])
+        # Initialize training dataset
+        self.initialize_dataset()
 
-    if tf.gfile.IsDirectory(MODEL_DIR):
-        checkpoint_path = tf.train.latest_checkpoint(MODEL_DIR)
-        variables_to_restore = [v for v in variables_to_restore if 'resnet_v1_50/' in v.name]
-        tf.train.init_from_checkpoint(checkpoint_path,
-                                      {v.name.split(':')[0]: v.name.split(':')[0] for v in variables_to_restore})
-    else:
-        checkpoint_path = RESNET_V1_CHECKPOINT_DIR
-        variables_to_restore = [v for v in variables_to_restore if
-                                'resnet_v1_50/' in v.name and 'real_domain/' not in v.name and 'synth_domain/' in v.name]
-        tf.train.init_from_checkpoint(checkpoint_path,
-                                      {v.name.split(':')[0].replace('synth_domain/', '', 1): v.name.split(':')[0] for v
-                                       in variables_to_restore})
+        # Define tensor for updating global step
+        self.global_step = tf.train.get_or_create_global_step()
 
-    loss = similarity_loss(rgb_descriptors, positive_depth_descriptors, negative_depth_descriptors)
-    return loss
+        # Build graph for network model
+        self.build_model()
 
-    if mode == tf.estimator.ModeKeys.TRAIN:
-        global_step = tf.train.get_global_step()
+    def initialize_dataset(self):
+        self.dataset = tf.data.Dataset.from_tensor_slices(TRAINING_TFRECORDS)
+        self.dataset = self.dataset.apply(tf.contrib.data.shuffle_and_repeat(self.batch_size * 5))
+        self.dataset = self.dataset.batch(self.batch_size)
+        self.dataset = self.dataset.prefetch(self.batch_size * 5)
+        self.dataset = self.dataset.make_one_shot_iterator()
+        self.dataset = self.dataset.get_next()
+
+    # Initialize session
+    def set_session(self, sess):
+        self.sess = sess
+
+    def build_model(self):
+        self.positive_depth_images = tf.placeholder(tf.float32, [None, 224, 224, 3], name='positive_depth_images')
+        self.negative_depth_images = tf.placeholder(tf.float32, [None, 224, 224, 3], name='negative_depth_images')
+        self.rgb_descriptors = tf.placeholder(tf.float32, [None, 2048], name='rgb_descriptors')
+        # Define placeholder for learning rate
+        self.learning_rt = tf.placeholder(tf.float32, name='learning_rt')
+
+        with tf.variable_scope('synth_domain'):
+            with slim.arg_scope(resnet_v1.resnet_arg_scope()):
+                # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
+                network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=True)
+
+                self.positive_depth_descriptors, endpoints = network_fn(self.positive_depth_images, reuse=tf.AUTO_REUSE)
+                self.negative_depth_descriptors, endpoints = network_fn(self.negative_depth_images, reuse=tf.AUTO_REUSE)
+
+        variables_to_restore = slim.get_variables_to_restore(include=['synth_domain'])
+
+        if tf.gfile.IsDirectory(MODEL_DIR):
+            checkpoint_path = tf.train.latest_checkpoint(MODEL_DIR)
+            variables_to_restore = [v for v in variables_to_restore if 'resnet_v1_50/' in v.name]
+            tf.train.init_from_checkpoint(checkpoint_path,
+                                          {v.name.split(':')[0]: v.name.split(':')[0] for v in variables_to_restore})
+        else:
+            checkpoint_path = RESNET_V1_CHECKPOINT_DIR
+            variables_to_restore = [v for v in variables_to_restore if
+                                    'resnet_v1_50/' in v.name and 'real_domain/' not in v.name and 'synth_domain/' in v.name]
+            tf.train.init_from_checkpoint(checkpoint_path,
+                                          {v.name.split(':')[0].replace('synth_domain/', '', 1): v.name.split(':')[0] for v
+                                           in variables_to_restore})
+
+        self.loss = self.similarity_loss(self.rgb_descriptors, self.positive_depth_descriptors, self.negative_depth_descriptors)
 
         learning_rate = tf.train.exponential_decay(
-            learning_rate=STARTING_LR,
-            global_step=global_step,
+            learning_rate=self.learning_rate,
+            global_step=self.global_step,
             decay_steps=23206,
             decay_rate=0.1,
             staircase=True,
             name="learning_rate"
         )
 
-        optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-
-        train_op = optimizer.minimize(
-            loss=loss,
-            global_step=global_step
+        self.optim = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(
+            loss=self.loss,
+            global_step=self.global_step
         )
 
-        tf.summary.image('pos_depth', positive_depth_images)
-        tf.summary.image('neg_depth', negative_depth_images)
+        tf.summary.scalar("Loss", self.loss)
+        tf.summary.image('pos_depth', self.positive_depth_images)
+        tf.summary.image('neg_depth', self.negative_depth_images)
+        self.merged_summaries = tf.summary.merge_all()
 
-        return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
+    def similarity_loss(self, rgb_descriptor, pos_descriptor, neg_descriptor):
+        s_pos = tf.reduce_sum(tf.square(rgb_descriptor - pos_descriptor), 1)
+        s_neg = tf.reduce_sum(tf.square(rgb_descriptor - neg_descriptor), 1)
 
-    # Add evaluation metrics (for EVAL mode)
-    if mode == tf.estimator.ModeKeys.EVAL:
-        eval_metric_ops = {
-        }
-        return tf.estimator.EstimatorSpec(mode=mode, loss=loss, eval_metric_ops=eval_metric_ops)
+        return self.descriptor_loss(s_pos, s_neg) + REG_CONSTANT * tf.losses.get_regularization_loss()
 
+    def descriptor_loss(self, s_pos, s_neg):
+        loss = tf.maximum(0.0, TRIPLET_LOSS_MARGIN + s_pos - s_neg)
+        loss = tf.reduce_mean(loss)
+        return loss
 
-def similarity_loss(rgb_descriptor, pos_descriptor, neg_descriptor):
-    s_pos = tf.reduce_sum(tf.square(rgb_descriptor - pos_descriptor), 1)
-    s_neg = tf.reduce_sum(tf.square(rgb_descriptor - neg_descriptor), 1)
+        # Train model
 
-    return descriptor_loss(s_pos, s_neg) + REG_CONSTANT * tf.losses.get_regularization_loss()
+    def train(self):
 
+        # Define summary writer for saving log files
+        self.writer = tf.summary.FileWriter('./Model/logs/', graph=tf.get_default_graph())
 
-def descriptor_loss(s_pos, s_neg):
-    loss = tf.maximum(0.0, TRIPLET_LOSS_MARGIN + s_pos - s_neg)
-    loss = tf.reduce_mean(loss)
-    return loss
+        # Iterate through 20000 training steps
+        while not self.sess.should_stop():
+
+            # Update globale step
+            step = tf.train.global_step(self.sess, self.global_step)
+
+            # Retrieve batch from data loader
+            (rgb_descriptor, pos_depth_image, negative_depth_image), _ = self.sess.run(self.dataset)
+
+            # Run optimization operation for current mini-batch
+            fd = {self.positive_depth_images: pos_depth_image, self.negative_depth_images: negative_depth_image, self.rgb_descriptors: rgb_descriptor, self.learning_rt: self.learning_rate}
+            self.sess.run(self.optim, feed_dict=fd)
+
+            # Save summary every 100 steps
+            if step % 100 == 0:
+                summary = self.sess.run(self.merged_summaries, feed_dict=fd)
+                self.writer.add_summary(summary, step)
+                self.writer.flush()
+
+            # Display progress every 1000 steps
+            if step % 100 == 0:
+                loss = self.sess.run(self.loss, feed_dict=fd)
+                print("Step %d:  %.10f" % (step, loss))
 
 
 def tfrecord_parser(serialized_example):
@@ -108,16 +160,18 @@ def tfrecord_parser(serialized_example):
             'positive_depth_image': tf.FixedLenFeature([], tf.string),
             'rgb_descriptor': tf.FixedLenFeature([], tf.float32),
             'negative_depth_images': tf.FixedLenFeature([], tf.string),
+            'num_negative_depth_images': tf.FixedLenFeature([], tf.int64),
+            'object_class': tf.FixedLenFeature([], tf.string)
         }
     )
 
     pos_depth_image = convert_string_to_image(features['positive_depth_image'])
 
     # Get random depth image
-    shuffled_depth_imgs = tf.random_shuffle(features['negative_depth_images'])
-    rand_neg_depth_image_raw = shuffled_depth_imgs[0]
-    negative_depth_image = convert_string_to_image(rand_neg_depth_image_raw)
-
+    num_neg_depth_imgs = tf.cast(features['num_negative_depth_images'], tf.int64)
+    random_idx = tf.random_uniform([], 0, num_neg_depth_imgs, dtype=tf.int64)
+    neg_depth_key = "img/neg/depth/" + random_idx
+    negative_depth_image = convert_string_to_image(features[neg_depth_key])
     object_class = features['object_class']
     rgb_descriptor = tf.cast(features['rgb_descriptor'], tf.float32)
 
@@ -176,7 +230,7 @@ def get_train_iterator():
 
 
 @click.command()
-@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/synth_models/model_one",
+@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/synth_models/model_test",
               help='Path to model to evaluate')
 def main(model_dir):
     # Create your own input function - https://www.tensorflow.org/guide/custom_estimators
@@ -184,36 +238,66 @@ def main(model_dir):
     global MODEL_DIR
     MODEL_DIR = model_dir
     with tf.device("/device:GPU:0"):
-        train_iterator = get_train_iterator()
+        # record_iterator = tf.python_io.tf_record_iterator(path=TRAINING_TFRECORDS)
 
-        next_example, next_label = train_iterator.get_next()
-        loss = synth_domain_cnn_model_fn(next_example, next_label)
 
-        global_step = tf.train.get_global_step()
+        # Create artificial data
+        # x_data = np.pi / 2 * np.random.normal(size=[100 * 10000, 1])
+        # y_data = np.sin(x_data)
 
-        learning_rate = tf.train.exponential_decay(
-            learning_rate=STARTING_LR,
-            global_step=global_step,
-            decay_steps=23206,
-            decay_rate=0.1,
-            staircase=True,
-            name="learning_rate"
-        )
+        # Specify initial learning rate
+        learning_rate = STARTING_LR
 
-        optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
+        # Initialize model
+        model = SynthDomainCNN(learning_rate, BATCH_SIZE)
 
-        training_op = optimizer.minimize(
-            loss=loss,
-            global_step=global_step
-        )
+        # Specify number of training steps
+        training_steps = 20000
 
-        tensors_to_log = {"loss": "loss", "learning_rate": "learning_rate", }
-        logging_hook = tf.train.LoggingTensorHook(tensors=tensors_to_log, every_n_iter=100)
+        # Initialize TensorFlow monitored training session
+        with tf.train.MonitoredTrainingSession(
+                checkpoint_dir=model_dir,
+                hooks=[tf.train.StopAtStepHook(last_step=training_steps)],
+                save_summaries_steps=None,
+                save_checkpoint_steps=500) as sess:
+            # Initialize model session
+            model.set_session(sess)
 
-        with tf.train.MonitoredTrainingSession(checkpoint_dir=MODEL_DIR, hooks=[logging_hook],
-                                               save_checkpoint_steps=100) as sess:
-            while not sess.should_stop():
-                sess.run(training_op)
+            # Train model
+            model.train()
+
+        # train_iterator = get_train_iterator()
+        #
+        #
+        # next_example, next_label = train_iterator.get_next()
+        #
+        # loss = synth_domain_cnn_model_fn(next_example, next_label)
+        #
+        # global_step = tf.train.get_global_step()
+        #
+        # learning_rate = tf.train.exponential_decay(
+        #     learning_rate=STARTING_LR,
+        #     global_step=global_step,
+        #     decay_steps=23206,
+        #     decay_rate=0.1,
+        #     staircase=True,
+        #     name="learning_rate"
+        # )
+        #
+        # optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
+        #
+        # training_op = optimizer.minimize(
+        #     loss=loss,
+        #     global_step=global_step
+        # )
+        #
+        # tensors_to_log = {"loss": "loss", "learning_rate": "learning_rate", }
+        # logging_hook = tf.train.LoggingTensorHook(tensors=tensors_to_log, every_n_iter=100)
+        #
+        # with tf.train.MonitoredTrainingSession(checkpoint_dir=MODEL_DIR, hooks=[logging_hook],
+        #                                        save_checkpoint_steps=100) as sess:
+        #     while not sess.should_stop():
+        #         sess.run(training_op)
 
 
 if __name__ == "__main__":
