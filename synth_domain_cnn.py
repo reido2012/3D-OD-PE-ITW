@@ -101,6 +101,7 @@ def tfrecord_parser(serialized_example):
         # Defaults are not specified since both keys are required.
         features={
             'positive_depth_image': tf.FixedLenFeature([], tf.string),
+            'img/neg/depth/0': tf.FixedLenFeature([], tf.string),
             'rgb_descriptor': tf.FixedLenFeature([], tf.float32),
             'negative_depth_images': tf.FixedLenFeature([], tf.string),
             'num_negative_depth_images': tf.FixedLenFeature([], tf.int64),
@@ -108,19 +109,7 @@ def tfrecord_parser(serialized_example):
         }
     )
 
-    num_neg_depth_imgs = tf.cast(features['num_negative_depth_images'], tf.int64)
-
-    # TODO: Define a session just to get evaluate random index
-    random_idx = tf.random_uniform([], 0, num_neg_depth_imgs, dtype=tf.int64)
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
-        print(num_neg_depth_imgs.eval())
-        print(random_idx.eval())
-        random_idx = sess.run([random_idx, num_neg_depth_imgs])
-        neg_depth_key = "img/neg/depth/" + random_idx
-        sess.close()
-
-    negative_depth_image = convert_string_to_image(features[neg_depth_key])
+    negative_depth_image = convert_string_to_image(features["img/neg/depth/0"])
     pos_depth_image = convert_string_to_image(features['positive_depth_image'])
 
     object_class = features['object_class']
