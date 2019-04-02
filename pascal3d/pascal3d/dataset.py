@@ -786,7 +786,7 @@ class Pascal3DDataset(object):
                     negative_depth_image_raw = negative_depth_image.tostring()
                     raw_negative_depth_images.append(negative_depth_image_raw)
 
-                rgb_descriptor = descriptor_dict[(data_id, obj_idx)].squeeze()
+                rgb_descriptor = descriptor_dict[(data_id, obj_idx)].squeeze().astype(np.float)
                 raw_negative_depth_image = raw_negative_depth_images[0]
 
                 self._write_synth_record(writer, resized_img, rgb_descriptor, positive_depth_image, cad_index, cls,
