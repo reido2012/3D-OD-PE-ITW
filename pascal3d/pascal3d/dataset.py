@@ -792,7 +792,7 @@ class Pascal3DDataset(object):
                 print(f"RGB Descriptor: \n {rgb_descriptor}")
                 print(rgb_descriptor.shape)
                 print("Squeezed: ")
-                print(rgb_descriptor.squeeze())
+                print(rgb_descriptor.squeeze().shape)
                 print("Len Raw Neg Depth Images")
                 print(len(raw_negative_depth_images))
                 print("Image Shapes")
