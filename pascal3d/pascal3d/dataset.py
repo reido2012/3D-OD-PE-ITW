@@ -784,21 +784,10 @@ class Pascal3DDataset(object):
                 for negative_depth_path in negative_depth_paths[:1]:
                     negative_depth_image = scipy.misc.imread(negative_depth_path, mode='RGB')
                     negative_depth_image = scipy.misc.imresize(negative_depth_image, (224, 224, 3))
-                    print(f"Neg: {negative_depth_image.shape}")
                     negative_depth_image_raw = negative_depth_image.tostring()
                     raw_negative_depth_images.append(negative_depth_image_raw)
 
-                rgb_descriptor = descriptor_dict[(data_id, obj_idx)]
-                print(f"RGB Descriptor: \n {rgb_descriptor}")
-                print(rgb_descriptor.shape)
-                print("Squeezed: ")
-                print(rgb_descriptor.squeeze())
-                print(rgb_descriptor.squeeze().shape)
-                print("Len Raw Neg Depth Images")
-                print(len(raw_negative_depth_images))
-                print("Image Shapes")
-                print("Pos: {positive_depth_image.shape}")
-
+                rgb_descriptor = descriptor_dict[(data_id, obj_idx)].squeeze()
                 raw_negative_depth_image = raw_negative_depth_images[0]
 
                 self._write_synth_record(writer, resized_img, rgb_descriptor, positive_depth_image, cad_index, cls,
@@ -808,7 +797,6 @@ class Pascal3DDataset(object):
     def _write_synth_record(self, record_writer, image, rgb_descriptor, positive_depth_map_image, cad_index,
                             object_class, data_id, object_index, raw_negative_depth_image, num_neg_depth_imgs):
 
-        rgb_descriptor = rgb_descriptor.squeeze()
         depth_img_raw = positive_depth_map_image.tostring()
         img_raw = image.tostring()
 
