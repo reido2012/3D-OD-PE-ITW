@@ -135,6 +135,7 @@ def convert_string_to_image(image_string):
     image_shape = tf.cond(shape_pred, lambda: tf.stack([IMAGE_SIZE, IMAGE_SIZE, 1]),
                           lambda: tf.stack([IMAGE_SIZE, IMAGE_SIZE, 3]))
 
+    print("Within Convert String")
     input_image = tf.reshape(image, image_shape)
 
     channel_pred = tf.cast(tf.equal(tf.shape(input_image)[2], greyscale_channel), tf.bool)
