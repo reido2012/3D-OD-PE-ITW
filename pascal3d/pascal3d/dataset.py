@@ -784,7 +784,7 @@ class Pascal3DDataset(object):
                 for negative_depth_path in negative_depth_paths[:1]:
                     negative_depth_image = scipy.misc.imread(negative_depth_path, mode='RGB')
                     negative_depth_image = scipy.misc.imresize(negative_depth_image, (224, 224, 3))
-                    print("Neg: {negative_depth_image.shape}")
+                    print("Neg: f{negative_depth_image.shape}")
                     negative_depth_image_raw = negative_depth_image.tostring()
                     raw_negative_depth_images.append(negative_depth_image_raw)
 
@@ -792,6 +792,7 @@ class Pascal3DDataset(object):
                 print(f"RGB Descriptor: \n {rgb_descriptor}")
                 print(rgb_descriptor.shape)
                 print("Squeezed: ")
+                print(rgb_descriptor.squeeze())
                 print(rgb_descriptor.squeeze().shape)
                 print("Len Raw Neg Depth Images")
                 print(len(raw_negative_depth_images))
