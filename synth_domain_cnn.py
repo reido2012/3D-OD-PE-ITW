@@ -129,7 +129,7 @@ def convert_string_to_image(image_string):
 
     image = tf.decode_raw(image_string, tf.uint8)
     image = tf.to_float(image)
-
+    image = image[:,:,:3]
     # Image is not in correct shape so
     shape_pred = tf.cast(tf.equal(tf.size(image), greyscale_size), tf.bool)
     image_shape = tf.cond(shape_pred, lambda: tf.stack([IMAGE_SIZE, IMAGE_SIZE, 1]),
