@@ -775,7 +775,6 @@ class Pascal3DDataset(object):
                                                                                              obj_id, OBJ_DIR,
                                                                                              local=local)
 
-                print("PD Image Path: " + positive_depth_map_image_path)
                 positive_depth_image = scipy.misc.imread(positive_depth_map_image_path)
                 positive_depth_image = scipy.misc.imresize(positive_depth_image, (224, 224, 3))
 
