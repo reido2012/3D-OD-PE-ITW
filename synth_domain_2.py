@@ -160,26 +160,14 @@ def tfrecord_parser(serialized_example):
         features={
             'positive_depth_image': tf.FixedLenFeature([], tf.string),
             'rgb_descriptor': tf.FixedLenFeature([], tf.float32),
-            'negative_depth_images': tf.FixedLenFeature([], tf.string),
+            'img/neg/depth/0': tf.FixedLenFeature([], tf.string),
             'num_negative_depth_images': tf.FixedLenFeature([], tf.int64),
             'object_class': tf.FixedLenFeature([], tf.string)
         }
     )
-    example_proto = tf.train.Example.FromString(serialized_example)
-    print(example_proto)
+
     pos_depth_image = convert_string_to_image(features['positive_depth_image'])
-
-    # Get random depth image
-    num_neg_depth_imgs = tf.cast(features['num_negative_depth_images'], tf.int64)
-    print(list(features.keys()))
-    neg_depth_key = ""
-    for key in list(features.keys()):
-        if "img/neg/depth/" in key:
-            neg_depth_key = key
-
-    # random_idx = tf.random_uniform([], 0, num_neg_depth_imgs, dtype=tf.int64)
-    # neg_depth_key = "img/neg/depth/" + str(random_idx)
-    negative_depth_image = convert_string_to_image(features[neg_depth_key])
+    negative_depth_image = convert_string_to_image(features['img/neg/depth/0'])
     object_class = features['object_class']
     rgb_descriptor = tf.cast(features['rgb_descriptor'], tf.float32)
 

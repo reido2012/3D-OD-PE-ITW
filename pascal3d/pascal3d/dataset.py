@@ -585,7 +585,7 @@ class Pascal3DDataset(object):
             data_id = model_prediction["data_id"].decode('utf-8')
             object_idx = model_prediction["object_index"]
 
-            descriptor_dict[(data_id, object_idx)] = image_descriptor
+            descriptor_dict[(data_id, object_idx)] = np.array(image_descriptor)
 
         return descriptor_dict
 
@@ -779,20 +779,25 @@ class Pascal3DDataset(object):
                 positive_depth_image = scipy.misc.imread(positive_depth_map_image_path)
                 num_neg_depth_imgs = len(negative_depth_paths)
                 raw_negative_depth_images = []
-                for negative_depth_path in negative_depth_paths:
+                for negative_depth_path in negative_depth_paths[:1]:
                     negative_depth_image = scipy.misc.imread(negative_depth_path, mode='RGB')
                     negative_depth_image = scipy.misc.imresize(negative_depth_image, (224, 224, 3))
                     negative_depth_image_raw = negative_depth_image.tostring()
                     raw_negative_depth_images.append(negative_depth_image_raw)
 
                 rgb_descriptor = descriptor_dict[(data_id, obj_idx)]
+                print(f"RGB Descriptor: {rgb_descriptor}")
+                print(rgb_descriptor.shape)
+                print("Len Raw Neg Depth Images")
+                print(len(raw_negative_depth_images))
+                raw_negative_depth_image = raw_negative_depth_images[0]
 
                 self._write_synth_record(writer, resized_img, rgb_descriptor, positive_depth_image, cad_index, cls,
-                                         data_id, obj_id, raw_negative_depth_images, num_neg_depth_imgs)
+                                         data_id, obj_id, raw_negative_depth_image, num_neg_depth_imgs)
         writer.close()
 
     def _write_synth_record(self, record_writer, image, rgb_descriptor, positive_depth_map_image, cad_index,
-                            object_class, data_id, object_index, raw_negative_depth_images, num_neg_depth_imgs):
+                            object_class, data_id, object_index, raw_negative_depth_image, num_neg_depth_imgs):
 
         rgb_descriptor = rgb_descriptor.squeeze()
         depth_img_raw = positive_depth_map_image.tostring()
@@ -801,6 +806,7 @@ class Pascal3DDataset(object):
         feature = {
             'object_image': self._bytes_feature(img_raw),
             'positive_depth_image': self._bytes_feature(depth_img_raw),
+            'negative_depth_image': self._bytes_feature(raw_negative_depth_image),
             'num_negative_depth_images': self._int64_feature(num_neg_depth_imgs),
             'rgb_descriptor': self._floats_feature(rgb_descriptor),
             'object_class': self._bytes_feature(object_class.encode('utf-8')),
@@ -809,9 +815,6 @@ class Pascal3DDataset(object):
             'cad_index': self._bytes_feature(cad_index.encode('utf-8'))
         }
 
-        for idx, neg_raw in enumerate(raw_negative_depth_images):
-            key = "img/neg/depth/" + str(idx)
-            feature[key] = self._bytes_feature(neg_raw)
 
         example = tf.train.Example(features=tf.train.Features(feature=feature))
         record_writer.write(example.SerializeToString())
