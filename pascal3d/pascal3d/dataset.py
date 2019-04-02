@@ -812,7 +812,6 @@ class Pascal3DDataset(object):
             'cad_index': self._bytes_feature(cad_index.encode('utf-8'))
         }
 
-
         example = tf.train.Example(features=tf.train.Features(feature=feature))
         record_writer.write(example.SerializeToString())
 
