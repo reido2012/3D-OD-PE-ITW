@@ -7,7 +7,7 @@ from PIL import Image
 import numpy as np
 import skimage.io as io
 import tensorflow as tf
-TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords/"
+TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords_new/"
 RECORD_TO_CHECK = TFRECORDS_DIR + "imagenet_train.tfrecords"
 # OVERFIT_TEST_TFRECORDS = "/notebooks/selerio/overfit_check.tfrecords"
 # EVAL_TEST_TFRECORDS = "/home/omarreid/selerio/datasets/real_domain_tfrecords/imagenet_val.tfrecords"
@@ -22,23 +22,26 @@ def main():
         example = tf.train.Example()
         example.ParseFromString(string_record)    
 
-        image_list = example.features.feature['negative_depth_images'].bytes_list.value
+        print("RGB Descriptor")
+        rgb_descriptor = example.features.feature['rgb_descriptor'].bytes_list.value
 
+        print(rgb_descriptor)
+        print(rgb_descriptor.shape)
         # img_string = (example.features.feature['object_image']
         #                               .bytes_list
         #                               .value[0])
 
         # for i in range(len(image_list)):
-        img_1d = np.fromstring(image_list[0], dtype=np.uint8)
-        reconstructed_img = img_1d.reshape((224, 224, -1))
-
-        #break
-
-        fig = plt.figure()
-        ax = plt.subplot(1, 1, 1)
-        ax.imshow(reconstructed_img)
-
-        plt.savefig("checkkkkkkk.png")
+        # img_1d = np.fromstring(image_list[0], dtype=np.uint8)
+        # reconstructed_img = img_1d.reshape((224, 224, -1))
+        #
+        # #break
+        #
+        # fig = plt.figure()
+        # ax = plt.subplot(1, 1, 1)
+        # ax.imshow(reconstructed_img)
+        #
+        # plt.savefig("checkkkkkkk.png")
 
         return
 
