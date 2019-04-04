@@ -147,7 +147,7 @@ def convert_string_to_image(image_string):
 
 def dataset_base(dataset, shuffle=True):
     if shuffle:
-        dataset = dataset.shuffle(buffer_size=10000)
+        dataset = dataset.shuffle(buffer_size=5000)
 
     dataset = dataset.map(map_func=tfrecord_parser, num_parallel_calls=NUM_CPU_CORES)  # Parallelize data transformation
     dataset.apply(tf.contrib.data.ignore_errors())
@@ -161,7 +161,7 @@ def train_input_fn():
     """
     dataset = tf.data.TFRecordDataset(TRAINING_TFRECORDS)
     dataset = dataset_base(dataset)
-    dataset = dataset.repeat(count=10)  # Train for count epochs
+    dataset = dataset.repeat(count=1)  # Train for count epochs
 
     iterator = dataset.make_one_shot_iterator()
     features, labels = iterator.get_next()
@@ -181,7 +181,7 @@ def eval_input_fn():
 
 
 @click.command()
-@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/synth_models/model_one",
+@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/synth_models/model_two",
               help='Path to model to evaluate')
 def main(model_dir):
     # Create your own input function - https://www.tensorflow.org/guide/custom_estimators
