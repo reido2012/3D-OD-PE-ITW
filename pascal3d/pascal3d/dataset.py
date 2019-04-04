@@ -811,7 +811,7 @@ class Pascal3DDataset(object):
 
         for idx, neg_depth_img in enumerate(raw_negative_depth_images):
             base_key = "neg/depth/img/" + str(idx)
-            feature[base_key] = neg_depth_img
+            feature[base_key] = self._bytes_feature(neg_depth_img)
 
         example = tf.train.Example(features=tf.train.Features(feature=feature))
         record_writer.write(example.SerializeToString())
