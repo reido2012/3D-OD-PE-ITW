@@ -37,21 +37,16 @@ def visualize_embeddings(tfrecords_file):
             model_dir=MODEL_DIR
         )
 
-        all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(tfrecords_file),
-                                                         yield_single_examples=False)
+        all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(tfrecords_file))
 
         # # TODO: Try displaying only positive depth embeddings
         pos_embeddings = np.zeros((BATCH_SIZE, 2048))
         pos_depth_images = np.zeros((BATCH_SIZE, 224, 224, 3))
         # neg_embeddings = np.zeros((BATCH_SIZE, 2048))
         # rgb_embeddings = np.zeros((BATCH_SIZE, 2048))
-        print(all_model_predictions.shape)
-        print(len(all_model_predictions))
-        pos_embeddings = all_model_predictions["positive_depth_embeddings"].squeeze()
-        pos_depth_images = all_model_predictions["positive_depth_images"]
 
         for counter, prediction in enumerate(all_model_predictions):
-            pos_embeddings[counter:counter*BATCH_SIZE] = prediction["positive_depth_embeddings"]
+            pos_embeddings[counter] = prediction["positive_depth_embeddings"].squeeze()
             pos_depth_images[counter] = prediction["positive_depth_images"]
         #     neg_embeddings[i] = prediction['negative_depth_embeddings']
         #     rgb_embeddings[i] = prediction['rgb_embeddings']
