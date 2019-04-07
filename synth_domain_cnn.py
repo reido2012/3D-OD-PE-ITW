@@ -15,12 +15,13 @@ REG_CONSTANT = 1e-3
 MODEL_DIR = ""
 PATH_TO_RD_META = ""
 STARTING_LR = 1e-4
-TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords/"
+TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords_all_negs/"
 TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR + "pascal_train.tfrecords",  TFRECORDS_DIR + "imagenet_val.tfrecords"]
 EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
 NETWORK_NAME = 'resnet_v1_50'
 PRETRAINED_MODEL_DIR = "/home/omarreid/selerio/final_year_project/models/test_one"
 RESNET_V1_CHECKPOINT_DIR = "/home/omarreid/selerio/datasets/pre_trained_weights/resnet_v1_50.ckpt"
+potential_keys = ["neg/depth/img/0", "neg/depth/img/1", "neg/depth/img/2", "neg/depth/img/3", "neg/depth/img/4", "neg/depth/img/5"]
 
 
 def synth_domain_cnn_model_fn(features, labels, mode):
@@ -86,7 +87,7 @@ def similarity_loss(rgb_descriptor, pos_descriptor, neg_descriptor):
 
 
 def descriptor_loss(s_pos, s_neg):
-    loss = tf.maximum(0.0, TRIPLET_LOSS_MARGIN + s_pos - s_neg)
+    loss = tf.maximum(0.0,  s_pos - s_neg + TRIPLET_LOSS_MARGIN)
     loss = tf.reduce_mean(loss)
     return loss
 
@@ -108,7 +109,8 @@ def tfrecord_parser(serialized_example):
         }
     )
 
-    negative_depth_image = convert_string_to_image(features["negative_depth_image"])
+    key = np.random.choice(potential_keys)
+    negative_depth_image = convert_string_to_image(features[key])
     pos_depth_image = convert_string_to_image(features['positive_depth_image'])
 
     object_class = features['object_class']
