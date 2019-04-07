@@ -60,7 +60,7 @@ def visualize_embeddings(tfrecords_file):
         #     neg_embeddings[i] = prediction['negative_depth_embeddings']
         #     rgb_embeddings[i] = prediction['rgb_embeddings']
 
-        tf.get_default_session()._unsafe_unfinalize()
+        tf.get_default_graph()._unsafe_unfinalize()
 
         create_sprite(pos_depth_images, "pos_depth_sprite.png")
         tf.logging.info("Positive Embeddings shape: {}".format(pos_embeddings.shape))
