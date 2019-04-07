@@ -8,7 +8,7 @@ from nets import nets_factory, resnet_v1
 
 slim = tf.contrib.slim
 tf.logging.set_verbosity(tf.logging.INFO)
-BATCH_SIZE = 50
+BATCH_SIZE = 200
 NUM_CPU_CORES = 8
 IMAGE_SIZE = 224
 MODEL_DIR = ""
@@ -51,7 +51,7 @@ def visualize_embeddings(tfrecords_file):
         # rgb_embeddings = np.zeros((BATCH_SIZE, 2048))
 
         for counter, prediction in enumerate(all_model_predictions):
-            if counter == 50:
+            if counter == BATCH_SIZE:
                 break
 
             pos_emb = np.reshape(prediction["positive_depth_embeddings"].squeeze(), (1, 2048))
