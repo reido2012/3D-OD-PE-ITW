@@ -44,10 +44,11 @@ def visualize_embeddings(tfrecords_file):
         pos_depth_images = np.zeros((BATCH_SIZE, 224, 224, 3))
         # neg_embeddings = np.zeros((BATCH_SIZE, 2048))
         # rgb_embeddings = np.zeros((BATCH_SIZE, 2048))
+        print("Pos Embeddings Shape: ")
+        print(pos_embeddings.shape)
 
         for counter, prediction in enumerate(all_model_predictions):
-            print(prediction["positive_depth_embeddings"].shape)
-            print(prediction["positive_depth_embeddings"].squeeze())
+            print(prediction["positive_depth_embeddings"].squeeze().shape)
             pos_embeddings[counter] = prediction["positive_depth_embeddings"].squeeze()
             pos_depth_images[counter] = prediction["positive_depth_images"]
         #     neg_embeddings[i] = prediction['negative_depth_embeddings']
