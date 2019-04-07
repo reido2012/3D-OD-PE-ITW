@@ -42,7 +42,7 @@ def visualize_embeddings(tfrecords_file):
 
         all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(tfrecords_file))
 
-        tf.get_default_graph()._unsafe_unfinalize()
+        tf.get_default_session()._unsafe_unfinalize()
 
         # TODO: Try displaying only positive depth embeddings
         pos_embeddings = np.zeros((BATCH_SIZE, 2048))
