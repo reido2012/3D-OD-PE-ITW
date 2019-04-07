@@ -13,7 +13,7 @@ NUM_CPU_CORES = 8
 IMAGE_SIZE = 224
 MODEL_DIR = ""
 NETWORK_NAME = 'resnet_v1_50'
-TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords_new/"
+TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords_all_negs/"
 TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR + "pascal_train.tfrecords",
                       TFRECORDS_DIR + "imagenet_val.tfrecords"]
 EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
