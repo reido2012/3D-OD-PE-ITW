@@ -61,7 +61,7 @@ def visualize_embeddings(tfrecords_file):
         print(pos_embeddings.shape)
 
         # Visualize test embeddings
-        pos_embedding_var = tf.identity(pos_embeddings, name="pos_depth")
+        # pos_embedding_var = tf.identity(pos_embeddings, name="pos_depth")
         # pos_embedding_var = tf.Variable(pos_embeddings, name='pos_depth')
 
         eval_dir = os.path.join(MODEL_DIR, "eval")
@@ -69,7 +69,7 @@ def visualize_embeddings(tfrecords_file):
 
         config = projector.ProjectorConfig()
         embedding = config.embeddings.add()
-        embedding.tensor_name = pos_embedding_var.name
+        embedding.tensor_name = 'pos_depth'
 
         embedding.sprite.image_path = 'pos_depth_sprite.png'
         embedding.sprite.single_image_dim.extend([224, 224])
@@ -88,7 +88,7 @@ def visualize_embeddings(tfrecords_file):
 
         saver = tf.train.Saver()
         with tf.Session() as sess:
-            sess.run(pos_embedding_var.initializer)
+            sess.run(tf.global_variables_initializer())
             saver.save(sess, os.path.join(eval_dir, "pos_embeddings.ckpt"))
 
 
