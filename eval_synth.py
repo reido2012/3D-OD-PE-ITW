@@ -44,8 +44,6 @@ def visualize_embeddings(tfrecords_file):
         pos_depth_images = np.zeros((BATCH_SIZE, 224, 224, 3))
         # neg_embeddings = np.zeros((BATCH_SIZE, 2048))
         # rgb_embeddings = np.zeros((BATCH_SIZE, 2048))
-        print("Pos Embeddings Shape: ")
-        print(pos_embeddings.shape)
 
         for counter, prediction in enumerate(all_model_predictions):
             if counter == 50:
@@ -59,6 +57,8 @@ def visualize_embeddings(tfrecords_file):
 
         create_sprite(pos_depth_images, "pos_depth_sprite.png")
         tf.logging.info("Positive Embeddings shape: {}".format(pos_embeddings.shape))
+
+        print(pos_embeddings.shape)
 
         # Visualize test embeddings
         pos_embedding_var = tf.Variable(pos_embeddings, name='pos_depth')
@@ -95,9 +95,11 @@ def create_sprite(images, filename):
     eval_dir = os.path.join(MODEL_DIR, "eval")
     print("Eval Dir: ")
     print(eval_dir)
-    sprite = images_to_sprite(images)
     sprite_filepath = os.path.join(eval_dir, filename)
-    cv2.imwrite(sprite_filepath, sprite)
+
+    if not os.path.isfile(sprite_filepath):
+        sprite = images_to_sprite(images)
+        cv2.imwrite(sprite_filepath, sprite)
 
     return sprite_filepath
 
