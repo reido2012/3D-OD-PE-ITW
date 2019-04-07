@@ -32,6 +32,8 @@ def main(model_dir, tfrecords_file):
 def visualize_embeddings(tfrecords_file):
 
     with tf.device('/GPU:0'):
+        tf.reset_default_graph()
+
         synth_domain_cnn = tf.estimator.Estimator(
             model_fn=synth_domain_cnn_model_fn_predict,
             model_dir=MODEL_DIR
@@ -87,7 +89,7 @@ def visualize_embeddings(tfrecords_file):
         projector.visualize_embeddings(summary_writer, config)
 
         with tf.Session() as sess:
-            saver = tf.train.Saver()
+            saver = tf.train.Saver([pos_embedding_var])
             sess.run(pos_embedding_var.initializer)
             saver.save(sess, os.path.join(eval_dir, "pos_embeddings.ckpt"))
 
