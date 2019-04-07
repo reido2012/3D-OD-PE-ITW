@@ -8,11 +8,6 @@ import shutil
 import numpy as np
 import tensorflow as tf
 from tensorflow.contrib.tensorboard.plugins import projector
-
-import model.mnist_dataset as mnist_dataset
-from model.utils import Params
-from model.input_fn import test_input_fn
-from model.model_fn import model_fn
 from nets import nets_factory, resnet_v1
 
 slim = tf.contrib.slim
