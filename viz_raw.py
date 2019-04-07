@@ -31,7 +31,7 @@ def main():
     config = tf.estimator.RunConfig(tf_random_seed=230,
                                     model_dir=MODEL_DIR)
 
-    estimator = tf.estimator.Estimator(model_fn, config=config)
+    estimator = tf.estimator.Estimator(model_fn=synth_domain_cnn_model_fn_predict, config=config)
 
     # EMBEDDINGS VISUALIZATION
 
