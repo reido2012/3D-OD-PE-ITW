@@ -109,7 +109,12 @@ def tfrecord_parser(serialized_example):
         }
     )
 
-    key = np.random.choice(potential_keys[:int(features['num_negative_depth_images'])])
+    num_depth = features['num_negative_depth_images']
+    sess = tf.Session()
+    num_depth = sess.run(num_depth)
+    sess.close()
+
+    key = np.random.choice(potential_keys[:num_depth])
     negative_depth_image = convert_string_to_image(features[key])
     pos_depth_image = convert_string_to_image(features['positive_depth_image'])
 
