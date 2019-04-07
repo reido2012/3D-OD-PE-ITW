@@ -42,7 +42,7 @@ def visualize_embeddings(tfrecords_file):
 
         all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(tfrecords_file))
 
-        tf.get_default_session()._unsafe_unfinalize()
+
 
         # TODO: Try displaying only positive depth embeddings
         pos_embeddings = np.zeros((BATCH_SIZE, 2048))
@@ -59,6 +59,8 @@ def visualize_embeddings(tfrecords_file):
             pos_depth_images[counter] = prediction["positive_depth_images"]
         #     neg_embeddings[i] = prediction['negative_depth_embeddings']
         #     rgb_embeddings[i] = prediction['rgb_embeddings']
+
+        tf.get_default_session()._unsafe_unfinalize()
 
         create_sprite(pos_depth_images, "pos_depth_sprite.png")
         tf.logging.info("Positive Embeddings shape: {}".format(pos_embeddings.shape))
