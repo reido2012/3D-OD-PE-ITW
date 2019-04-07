@@ -70,11 +70,11 @@ def main():
 
     # Say that you want to visualise the embeddings
     projector.visualize_embeddings(summary_writer, config)
-
-    saver = tf.train.Saver()
-    with tf.Session() as sess:
-        sess.run(embedding_var.initializer)
-        saver.save(sess, os.path.join(eval_dir, "pos_depth.ckpt"))
+    #
+    # saver = tf.train.Saver()
+    # with tf.Session() as sess:
+    #     sess.run(embedding_var.initializer)
+    #     saver.save(sess, os.path.join(eval_dir, "pos_depth.ckpt"))
 
 
 def synth_domain_cnn_model_fn_predict(features, labels, mode):
