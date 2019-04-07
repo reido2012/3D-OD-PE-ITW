@@ -74,9 +74,9 @@ def visualize_embeddings(tfrecords_file):
 
         config = projector.ProjectorConfig()
         embedding = config.embeddings.add()
-        embedding.tensor_name = pos_embedding_var
+        embedding.tensor_name = pos_embedding_var.name
 
-        embedding.sprite.image_path = pos_embedding_var.name
+        embedding.sprite.image_path = "pos_depth_sprite.png"
         embedding.sprite.single_image_dim.extend([224, 224])
 
         # Say that you want to visualise the embeddings
