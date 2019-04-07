@@ -34,14 +34,15 @@ def visualize_embeddings(tfrecords_file):
     tf.reset_default_graph()
     tf.logging.set_verbosity(tf.logging.INFO)
 
+
+    synth_domain_cnn = tf.estimator.Estimator(
+        model_fn=synth_domain_cnn_model_fn_predict,
+        model_dir=MODEL_DIR
+    )
+
+    all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(tfrecords_file))
+
     with tf.device("/device:GPU:0"):
-        synth_domain_cnn = tf.estimator.Estimator(
-            model_fn=synth_domain_cnn_model_fn_predict,
-            model_dir=MODEL_DIR
-        )
-
-        all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(tfrecords_file))
-
         g = tf.Graph()
         with g.as_default():
             # TODO: Try displaying only positive depth embeddings
