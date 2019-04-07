@@ -62,7 +62,6 @@ def visualize_embeddings(tfrecords_file):
         tf.logging.info("Positive Embeddings shape: {}".format(pos_embeddings.shape))
 
         print(pos_embeddings.shape)
-        tf.reset_default_graph()
         # Visualize test embeddings
         # pos_embedding_var = tf.identity(pos_embeddings, name="pos_depth")
         pos_embedding_var = tf.Variable(pos_embeddings, name='pos_depth')
