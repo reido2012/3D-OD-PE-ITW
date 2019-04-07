@@ -61,7 +61,8 @@ def visualize_embeddings(tfrecords_file):
         print(pos_embeddings.shape)
 
         # Visualize test embeddings
-        pos_embedding_var = tf.Variable(pos_embeddings, name='pos_depth')
+        pos_embedding_var = tf.identity(pos_embeddings, name="pos_depth")
+        # pos_embedding_var = tf.Variable(pos_embeddings, name='pos_depth')
 
         eval_dir = os.path.join(MODEL_DIR, "eval")
         summary_writer = tf.summary.FileWriter(eval_dir)
