@@ -33,7 +33,6 @@ def visualize_embeddings(tfrecords_file):
 
     with tf.device('/GPU:0'):
 
-
         synth_domain_cnn = tf.estimator.Estimator(
             model_fn=synth_domain_cnn_model_fn_predict,
             model_dir=MODEL_DIR
@@ -57,6 +56,7 @@ def visualize_embeddings(tfrecords_file):
         #     neg_embeddings[i] = prediction['negative_depth_embeddings']
         #     rgb_embeddings[i] = prediction['rgb_embeddings']
 
+    with tf.device('CPU:0'):
 
         create_sprite(pos_depth_images, "pos_depth_sprite.png")
         tf.logging.info("Positive Embeddings shape: {}".format(pos_embeddings.shape))
