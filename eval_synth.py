@@ -31,6 +31,8 @@ def main(model_dir, tfrecords_file):
 
 
 def visualize_embeddings(tfrecords_file):
+    tf.reset_default_graph()
+    tf.logging.set_verbosity(tf.logging.INFO)
 
     with tf.device("/device:GPU:0"):
         synth_domain_cnn = tf.estimator.Estimator(
@@ -40,52 +42,48 @@ def visualize_embeddings(tfrecords_file):
 
         all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(tfrecords_file))
 
-        # TODO: Try displaying only positive depth embeddings
-        pos_embeddings = np.zeros((BATCH_SIZE, 2048))
-        pos_depth_images = np.zeros((BATCH_SIZE, 224, 224, 3))
-        # neg_embeddings = np.zeros((BATCH_SIZE, 2048))
-        # rgb_embeddings = np.zeros((BATCH_SIZE, 2048))
+        g = tf.Graph()
+        with g.as_default():
+            # TODO: Try displaying only positive depth embeddings
+            pos_embeddings = np.zeros((BATCH_SIZE, 2048))
+            pos_depth_images = np.zeros((BATCH_SIZE, 224, 224, 3))
+            # neg_embeddings = np.zeros((BATCH_SIZE, 2048))
+            # rgb_embeddings = np.zeros((BATCH_SIZE, 2048))
 
-        for counter, prediction in enumerate(all_model_predictions):
-            if counter == 50:
-                break
+            for counter, prediction in enumerate(all_model_predictions):
+                if counter == 50:
+                    break
 
-            pos_emb = np.reshape(prediction["positive_depth_embeddings"].squeeze(), (1, 2048))
-            pos_embeddings[counter] = pos_emb
-            pos_depth_images[counter] = prediction["positive_depth_images"]
-        #     neg_embeddings[i] = prediction['negative_depth_embeddings']
-        #     rgb_embeddings[i] = prediction['rgb_embeddings']
+                pos_emb = np.reshape(prediction["positive_depth_embeddings"].squeeze(), (1, 2048))
+                pos_embeddings[counter] = pos_emb
+                pos_depth_images[counter] = prediction["positive_depth_images"]
+            #     neg_embeddings[i] = prediction['negative_depth_embeddings']
+            #     rgb_embeddings[i] = prediction['rgb_embeddings']
 
-        create_sprite(pos_depth_images, "pos_depth_sprite.png")
-        tf.logging.info("Positive Embeddings shape: {}".format(pos_embeddings.shape))
+            create_sprite(pos_depth_images, "pos_depth_sprite.png")
+            tf.logging.info("Positive Embeddings shape: {}".format(pos_embeddings.shape))
 
-        print(pos_embeddings.shape)
-        # Visualize test embeddings
-        # pos_embedding_var = tf.identity(pos_embeddings, name="pos_depth")
-        # pos_embedding_var = tf.Variable(pos_embeddings, name='pos_depth')
+            # Visualize test embeddings
+            # pos_embedding_var = tf.identity(pos_embeddings, name="pos_depth")
+            pos_embedding_var = tf.Variable(pos_embeddings, name='pos_depth')
 
-        eval_dir = os.path.join(MODEL_DIR, "eval")
-        summary_writer = tf.summary.FileWriter(eval_dir)
+            eval_dir = os.path.join(MODEL_DIR, "eval")
+            summary_writer = tf.summary.FileWriter(eval_dir)
 
-        config = projector.ProjectorConfig()
-        embedding = config.embeddings.add()
-        embedding.tensor_name = 'pos_depth'
+            config = projector.ProjectorConfig()
+            embedding = config.embeddings.add()
+            embedding.tensor_name = 'pos_depth'
 
-        embedding.sprite.image_path = 'pos_depth_sprite.png'
-        embedding.sprite.single_image_dim.extend([224, 224])
+            embedding.sprite.image_path = 'pos_depth_sprite.png'
+            embedding.sprite.single_image_dim.extend([224, 224])
 
-        # Say that you want to visualise the embeddings
-        projector.visualize_embeddings(summary_writer, config)
+            # Say that you want to visualise the embeddings
+            projector.visualize_embeddings(summary_writer, config)
 
-        sess = tf.InteractiveSession()
-        sess.run(tf.global_variables_initializer())
-        saver = tf.train.Saver()
-        saver.save(sess, os.path.join(os.path.join(eval_dir, "pos_embeddings.ckpt"), "model.ckpt"), 1)
-
-        # with tf.Session() as sess:
-        #     saver = tf.train.Saver()
-        #     sess.run(pos_embedding_var.initializer)
-        #     saver.save(sess, os.path.join(eval_dir, "pos_embeddings.ckpt"))
+            with tf.Session() as sess:
+                saver = tf.train.Saver()
+                sess.run(pos_embedding_var.initializer)
+                saver.save(sess, os.path.join(eval_dir, "pos_embeddings.ckpt"))
 
 
 def create_sprite(images, filename):
