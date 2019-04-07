@@ -40,6 +40,9 @@ def visualize_embeddings(tfrecords_file):
 
         all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(tfrecords_file))
 
+        with tf.Session() as sess:
+            sess.graph._unsafe_unfinalize()
+
         # TODO: Try displaying only positive depth embeddings
         pos_embeddings = np.zeros((BATCH_SIZE, 2048))
         pos_depth_images = np.zeros((BATCH_SIZE, 224, 224, 3))
@@ -78,7 +81,6 @@ def visualize_embeddings(tfrecords_file):
         projector.visualize_embeddings(summary_writer, config)
 
         with tf.Session() as sess:
-            sess.graph._unsafe_unfinalize()
             saver = tf.train.Saver()
             sess.run(pos_embedding_var.initializer)
             saver.save(sess, os.path.join(eval_dir, "pos_embeddings.ckpt"))
