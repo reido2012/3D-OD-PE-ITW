@@ -190,7 +190,7 @@ def tfrecord_parser(serialized_example):
         # Defaults are not specified since both keys are required.
         features={
             'positive_depth_image': tf.FixedLenFeature([], tf.string),
-            '"neg/depth/img/0"': tf.FixedLenFeature([], tf.string),
+            'neg/depth/img/0': tf.FixedLenFeature([], tf.string),
             'object_image':  tf.FixedLenFeature([], tf.string),
             'rgb_descriptor': tf.FixedLenFeature([2048], tf.float32),
             'num_negative_depth_images': tf.FixedLenFeature([], tf.int64),
