@@ -48,7 +48,7 @@ def visualize_embeddings(tfrecords_file):
         print(pos_embeddings.shape)
 
         for counter, prediction in enumerate(all_model_predictions):
-            print(prediction["positive_depth_embeddings"].squeeze().shape)
+            print(np.reshape(prediction["positive_depth_embeddings"].squeeze(), (1, 2048)))
             pos_embeddings[counter] = prediction["positive_depth_embeddings"].squeeze()
             pos_depth_images[counter] = prediction["positive_depth_images"]
         #     neg_embeddings[i] = prediction['negative_depth_embeddings']
