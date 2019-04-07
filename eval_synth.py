@@ -32,8 +32,7 @@ def main(model_dir, tfrecords_file):
 
 def visualize_embeddings(tfrecords_file):
 
-    with tf.device('/GPU:0'):
-
+    with tf.device("/device:GPU:0"):
         synth_domain_cnn = tf.estimator.Estimator(
             model_fn=synth_domain_cnn_model_fn_predict,
             model_dir=MODEL_DIR
