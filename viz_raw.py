@@ -23,7 +23,6 @@ TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR 
 EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
 
 def main():
-    tf.reset_default_graph()
     tf.logging.set_verbosity(tf.logging.INFO)
 
     # Define the model
@@ -38,38 +37,43 @@ def main():
     # Compute embeddings on the test set
     tf.logging.info("Predicting")
     predictions = estimator.predict(input_fn=lambda: predict_input_fn(EVAL_TFRECORDS))
+    tf.reset_default_graph()
+    with tf.Session() as sess:
+        pos_embeddings = np.zeros((BATCH_SIZE, 2048))
+        pos_depth_images = np.zeros((BATCH_SIZE, 224, 224, 3))
 
-    pos_embeddings = np.zeros((BATCH_SIZE, 2048))
-    pos_depth_images = np.zeros((BATCH_SIZE, 224, 224, 3))
+        for counter, prediction in enumerate(predictions):
+            if counter == 50:
+                break
 
-    for counter, prediction in enumerate(predictions):
-        if counter == 50:
-            break
+            pos_emb = np.reshape(prediction["positive_depth_embeddings"].squeeze(), (1, 2048))
+            pos_embeddings[counter] = pos_emb
+            pos_depth_images[counter] = prediction["positive_depth_images"]
 
-        pos_emb = np.reshape(prediction["positive_depth_embeddings"].squeeze(), (1, 2048))
-        pos_embeddings[counter] = pos_emb
-        pos_depth_images[counter] = prediction["positive_depth_images"]
+        tf.logging.info("Embeddings shape: {}".format(pos_embeddings.shape))
 
-    tf.logging.info("Embeddings shape: {}".format(pos_embeddings.shape))
+        # Visualize test embeddings
+        embedding_var = tf.Variable(pos_embeddings, name='pos_embedding')
 
-    # Visualize test embeddings
-    embedding_var = tf.Variable(pos_embeddings, name='pos_embedding')
+        eval_dir = os.path.join(MODEL_DIR, "eval")
+        summary_writer = tf.summary.FileWriter(eval_dir)
 
-    eval_dir = os.path.join(MODEL_DIR, "eval")
-    summary_writer = tf.summary.FileWriter(eval_dir)
+        config = projector.ProjectorConfig()
+        embedding = config.embeddings.add()
+        embedding.tensor_name = embedding_var.name
 
-    config = projector.ProjectorConfig()
-    embedding = config.embeddings.add()
-    embedding.tensor_name = embedding_var.name
+        # Specify where you find the sprite (we will create this later)
+        # Copy the embedding sprite image to the eval directory
+        # shutil.copy2(args.sprite_filename, eval_dir)
+        embedding.sprite.image_path = 'pos_depth_sprite.png'
+        embedding.sprite.single_image_dim.extend([224, 224])
 
-    # Specify where you find the sprite (we will create this later)
-    # Copy the embedding sprite image to the eval directory
-    # shutil.copy2(args.sprite_filename, eval_dir)
-    embedding.sprite.image_path = 'pos_depth_sprite.png'
-    embedding.sprite.single_image_dim.extend([224, 224])
+        # Say that you want to visualise the embeddings
+        projector.visualize_embeddings(summary_writer, config)
 
-    # Say that you want to visualise the embeddings
-    projector.visualize_embeddings(summary_writer, config)
+        sess.run(embedding_var.initializer)
+        saver = tf.train.Saver()
+        saver.save(sess, os.path.join(eval_dir, "pos_depth.ckpt"))
     #
     # saver = tf.train.Saver()
     # with tf.Session() as sess:
