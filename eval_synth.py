@@ -32,7 +32,7 @@ def main(model_dir, tfrecords_file):
 def visualize_embeddings(tfrecords_file):
 
     with tf.device('/GPU:0'):
-        tf.reset_default_graph()
+
 
         synth_domain_cnn = tf.estimator.Estimator(
             model_fn=synth_domain_cnn_model_fn_predict,
@@ -57,11 +57,12 @@ def visualize_embeddings(tfrecords_file):
         #     neg_embeddings[i] = prediction['negative_depth_embeddings']
         #     rgb_embeddings[i] = prediction['rgb_embeddings']
 
+
         create_sprite(pos_depth_images, "pos_depth_sprite.png")
         tf.logging.info("Positive Embeddings shape: {}".format(pos_embeddings.shape))
 
         print(pos_embeddings.shape)
-
+        tf.reset_default_graph()
         # Visualize test embeddings
         # pos_embedding_var = tf.identity(pos_embeddings, name="pos_depth")
         pos_embedding_var = tf.Variable(pos_embeddings, name='pos_depth')
@@ -75,15 +76,6 @@ def visualize_embeddings(tfrecords_file):
 
         embedding.sprite.image_path = 'pos_depth_sprite.png'
         embedding.sprite.single_image_dim.extend([224, 224])
-
-        # Specify where you find the metadata
-        # Save the metadata file needed for Tensorboard projector
-        # metadata_filename = "pos_depth.tsv"
-        # with open(os.path.join(eval_dir, metadata_filename), 'w') as f:
-        #     for i in range(BATCH_SIZE):
-        #         c = labels[i]
-        #         f.write('{}\n'.format(c))
-        # embedding.metadata_path = metadata_filename
 
         # Say that you want to visualise the embeddings
         projector.visualize_embeddings(summary_writer, config)
