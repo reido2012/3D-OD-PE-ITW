@@ -26,7 +26,6 @@ EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
 def main(model_dir, tfrecords_file):
     global MODEL_DIR
     MODEL_DIR = model_dir
-    tfrecords_file = str(tfrecords_file)
     visualize_embeddings(tfrecords_file)
 
 
