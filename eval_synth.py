@@ -79,9 +79,7 @@ def visualize_embeddings(tfrecords_file):
         projector.visualize_embeddings(summary_writer, config)
 
         with tf.Session() as sess:
-            init = tf.initialize_all_variables()
-            sess.run(init)
-            saver = tf.train.Saver([pos_embedding_var])
+            saver = tf.train.Saver()
             sess.run(pos_embedding_var.initializer)
             saver.save(sess, os.path.join(eval_dir, "pos_embeddings.ckpt"))
 
