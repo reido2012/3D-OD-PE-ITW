@@ -42,6 +42,7 @@ def visualize_embeddings(tfrecords_file):
 
         all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(tfrecords_file))
 
+        tf.get_default_graph()._unsafe_unfinalize()
 
         # TODO: Try displaying only positive depth embeddings
         pos_embeddings = np.zeros((BATCH_SIZE, 2048))
@@ -64,14 +65,14 @@ def visualize_embeddings(tfrecords_file):
 
         # Visualize test embeddings
         # pos_embedding_var = tf.identity(pos_embeddings, name="pos_depth")
-        pos_embedding_var = tf.constant(pos_embeddings, name='pos_depth')
+        pos_embedding_var = tf.Variable(pos_embeddings, name='pos_depth')
 
         eval_dir = os.path.join(MODEL_DIR, "eval")
         summary_writer = tf.summary.FileWriter(eval_dir)
 
         config = projector.ProjectorConfig()
         embedding = config.embeddings.add()
-        embedding.tensor_name = 'pos_depth'
+        embedding.tensor_name = pos_embedding_var
 
         embedding.sprite.image_path = pos_embedding_var.name
         embedding.sprite.single_image_dim.extend([224, 224])
@@ -79,10 +80,10 @@ def visualize_embeddings(tfrecords_file):
         # Say that you want to visualise the embeddings
         projector.visualize_embeddings(summary_writer, config)
 
-        # with tf.Session() as sess:
-        #     saver = tf.train.Saver()
-        #     sess.run(pos_embedding_var.initializer)
-        #     saver.save(sess, os.path.join(eval_dir, "pos_embeddings.ckpt"))
+        with tf.Session() as sess:
+            saver = tf.train.Saver()
+            sess.run(pos_embedding_var.initializer)
+            saver.save(sess, os.path.join(eval_dir, "pos_embeddings.ckpt"))
 
 
 def create_sprite(images, filename):
@@ -91,9 +92,9 @@ def create_sprite(images, filename):
     print(eval_dir)
     sprite_filepath = os.path.join(eval_dir, filename)
 
-    # if not os.path.isfile(sprite_filepath):
-    sprite = images_to_sprite(images)
-    cv2.imwrite(sprite_filepath, sprite)
+    if not os.path.isfile(sprite_filepath):
+        sprite = images_to_sprite(images)
+        cv2.imwrite(sprite_filepath, sprite)
 
     return sprite_filepath
 
@@ -107,7 +108,6 @@ def images_to_sprite(data):
     Returns:
       data: Properly shaped HxWx3 image with any necessary padding.
     """
-    data = tf.image.resize_images(data, (50, 64, 64, 3))
     if len(data.shape) == 3:
         data = np.tile(data[..., np.newaxis], (1, 1, 1, 3))
     data = data.astype(np.float32)
