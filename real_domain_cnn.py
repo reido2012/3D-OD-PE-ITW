@@ -7,6 +7,7 @@ import click
 import cv2 
 import os
 import scipy.stats as st
+from scipy import ndimage
 from nets import nets_factory, resnet_v1
 
 slim = tf.contrib.slim
@@ -18,7 +19,7 @@ TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR 
 EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
 RESNET_V1_CHECKPOINT_DIR = "/home/omarreid/selerio/datasets/pre_trained_weights/resnet_v1_50.ckpt"
 NETWORK_NAME = 'resnet_v1_50'
-BATCH_SIZE = 40
+BATCH_SIZE = 50
 NUM_CPU_CORES = 8
 IMAGE_SIZE = 224  # To match ResNet dimensions
 GREYSCALE_SIZE = tf.constant(50176)
@@ -86,7 +87,7 @@ def real_domain_cnn_model_fn(features, labels, mode):
         learning_rate = tf.train.exponential_decay(
             learning_rate=STARTING_LR,
             global_step=global_step,
-            decay_steps=50000,
+            decay_steps=46000,
             decay_rate=0.1,
             staircase=True,
             name="learning_rate"
@@ -127,7 +128,7 @@ def dimension_loss(dimension_labels, dimension_logits):
 
 def dataset_base(dataset, shuffle=True):
     if shuffle:
-        dataset = dataset.shuffle(buffer_size=10000)
+        dataset = dataset.shuffle(buffer_size=5000)
 
     dataset = dataset.map(map_func=tfrecord_parser, num_parallel_calls=NUM_CPU_CORES)  # Parallelize data transformation
     dataset.apply(tf.contrib.data.ignore_errors())
@@ -141,7 +142,7 @@ def train_input_fn():
     """
     dataset = tf.data.TFRecordDataset(TRAINING_TFRECORDS)
     dataset = dataset_base(dataset)
-    dataset = dataset.repeat(count=10)  # Train for count epochs
+    dataset = dataset.repeat(count=50)  # Train for count epochs
 
     iterator = dataset.make_one_shot_iterator()
     features, labels = iterator.get_next()
@@ -160,7 +161,7 @@ def eval_input_fn():
     return features, labels
 
 
-def tfrecord_parser(serialized_example):
+def tfrecord_parser(serialized_example, standardize=True):
     """
         Parses a single tf.Example into image and label tensors.
         """
@@ -188,12 +189,14 @@ def tfrecord_parser(serialized_example):
     channel_pred = tf.cast(tf.equal(tf.shape(input_image)[2], GREYSCALE_CHANNEL), tf.bool)
     input_image = tf.cond(channel_pred, lambda: tf.image.grayscale_to_rgb(input_image), lambda: input_image)
     input_image = tf.reshape(input_image, (224, 224, 3))
-    
+    input_image = ndimage.gaussian_filter(input_image, sigma=3)
     #blur_predicate = tf.cast(tf.greater(tf.random_uniform([], 0, 1),  0.5), tf.bool)
     #input_image = tf.cond(blur_predicate, lambda: blur_image(input_image), lambda: input_image)
 
     output_vector = tf.cast(features['output_vector'], tf.float32)
-    input_image = tf.image.per_image_standardization(input_image)
+
+    if standardize:
+        input_image = tf.image.per_image_standardization(input_image)
     
     return input_image, output_vector
 
@@ -255,7 +258,7 @@ def make_gauss_var(name, size, sigma, c_i):
 
 
 @click.command()
-@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/models/model_one",
+@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/models/diss_test_1",
               help='Path to model to evaluate')
 def main(model_dir):
     # Create your own input function - https://www.tensorflow.org/guide/custom_estimators
