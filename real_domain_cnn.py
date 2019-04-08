@@ -189,7 +189,7 @@ def tfrecord_parser(serialized_example, standardize=True):
     channel_pred = tf.cast(tf.equal(tf.shape(input_image)[2], GREYSCALE_CHANNEL), tf.bool)
     input_image = tf.cond(channel_pred, lambda: tf.image.grayscale_to_rgb(input_image), lambda: input_image)
     input_image = tf.reshape(input_image, (224, 224, 3))
-    input_image = ndimage.gaussian_filter(input_image, sigma=3)
+
     #blur_predicate = tf.cast(tf.greater(tf.random_uniform([], 0, 1),  0.5), tf.bool)
     #input_image = tf.cond(blur_predicate, lambda: blur_image(input_image), lambda: input_image)
 
