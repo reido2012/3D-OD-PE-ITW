@@ -8,7 +8,7 @@ from nets import nets_factory, resnet_v1
 
 slim = tf.contrib.slim
 tf.logging.set_verbosity(tf.logging.INFO)
-BATCH_SIZE = 200
+BATCH_SIZE = 50
 NUM_CPU_CORES = 8
 IMAGE_SIZE = 224
 MODEL_DIR = ""
@@ -20,7 +20,7 @@ EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
 
 
 @click.command()
-@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/synth_models/model_two",
+@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/synth_models/model_three",
               help='Path to model to evaluate')
 @click.option('--tfrecords_file', default=EVAL_TFRECORDS, help='Path to TFRecords file to evaluate model on', type=str)
 def main(model_dir, tfrecords_file):
@@ -42,12 +42,13 @@ def visualize_embeddings(tfrecords_file):
 
         all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(tfrecords_file))
 
-
-
         # TODO: Try displaying only positive depth embeddings
         pos_embeddings = np.zeros((BATCH_SIZE, 2048))
         pos_depth_images = np.zeros((BATCH_SIZE, 224, 224, 3))
-        # neg_embeddings = np.zeros((BATCH_SIZE, 2048))
+
+        neg_embeddings = np.zeros((BATCH_SIZE, 2048))
+        neg_depth_images = np.zeros((BATCH_SIZE, 224, 224, 3))
+
         # rgb_embeddings = np.zeros((BATCH_SIZE, 2048))
 
         for counter, prediction in enumerate(all_model_predictions):
@@ -57,27 +58,36 @@ def visualize_embeddings(tfrecords_file):
             pos_emb = np.reshape(prediction["positive_depth_embeddings"].squeeze(), (1, 2048))
             pos_embeddings[counter] = pos_emb
             pos_depth_images[counter] = prediction["positive_depth_images"]
-        #     neg_embeddings[i] = prediction['negative_depth_embeddings']
-        #     rgb_embeddings[i] = prediction['rgb_embeddings']
+
+            neg_emb = np.reshape(prediction["negative_depth_embeddings"].squeeze(), (1, 2048))
+            neg_embeddings[counter] = neg_emb
+            neg_depth_images[counter] = prediction["negative_depth_images"]
+
 
         tf.get_default_graph()._unsafe_unfinalize()
 
         create_sprite(pos_depth_images, "pos_depth_sprite.png")
         tf.logging.info("Positive Embeddings shape: {}".format(pos_embeddings.shape))
+        create_sprite(pos_depth_images, "neg_depth_sprite.png")
+        tf.logging.info("Negative Embeddings shape: {}".format(neg_embeddings.shape))
 
-        # Visualize test embeddings
-        # pos_embedding_var = tf.identity(pos_embeddings, name="pos_depth")
         pos_embedding_var = tf.Variable(pos_embeddings, name='pos_depth')
+        neg_embedding_var = tf.Variable(pos_embeddings, name='neg_depth')
 
         eval_dir = os.path.join(MODEL_DIR, "eval")
         summary_writer = tf.summary.FileWriter(eval_dir)
 
         config = projector.ProjectorConfig()
-        embedding = config.embeddings.add()
-        embedding.tensor_name = pos_embedding_var.name
 
-        embedding.sprite.image_path = "pos_depth_sprite.png"
-        embedding.sprite.single_image_dim.extend([224, 224])
+        pos_embedding = config.embeddings.add()
+        pos_embedding.tensor_name = pos_embedding_var.name
+        pos_embedding.sprite.image_path = "pos_depth_sprite.png"
+        pos_embedding.sprite.single_image_dim.extend([224, 224])
+
+        neg_embedding = config.embeddings.add()
+        neg_embedding.tensor_name = neg_embedding_var.name
+        neg_embedding.sprite.image_path = "neg_depth_sprite.png"
+        neg_embedding.sprite.single_image_dim.extend([224, 224])
 
         # Say that you want to visualise the embeddings
         projector.visualize_embeddings(summary_writer, config)
@@ -86,7 +96,7 @@ def visualize_embeddings(tfrecords_file):
             saver = tf.train.Saver()
             sess.run(tf.initializers.global_variables())
             sess.run(pos_embedding_var.initializer)
-            saver.save(sess, os.path.join(eval_dir, "pos_embeddings.ckpt"))
+            saver.save(sess, os.path.join(eval_dir, "embeddings.ckpt"))
 
 
 def create_sprite(images, filename):
@@ -177,7 +187,7 @@ def predict_input_fn(tfrecords_file):
 
 def dataset_base(dataset, shuffle=True):
     if shuffle:
-        dataset = dataset.shuffle(buffer_size=5000)
+        dataset = dataset.shuffle(buffer_size=1000)
 
     dataset = dataset.map(map_func=tfrecord_parser, num_parallel_calls=NUM_CPU_CORES)  # Parallelize data transformation
     dataset.apply(tf.contrib.data.ignore_errors())
@@ -203,21 +213,22 @@ def tfrecord_parser(serialized_example):
         }
     )
 
-    negative_depth_image = convert_string_to_image(features["neg/depth/img/0"])
-    pos_depth_image = convert_string_to_image(features['positive_depth_image'])
-    object_image = convert_string_to_image(features['object_image'])
-
     object_class = features['object_class']
     rgb_descriptor = tf.cast(features['rgb_descriptor'], tf.float32)
+
+    negative_depth_image = convert_string_to_image(features["neg/depth/img/0"], standardize=False)
+    pos_depth_image = convert_string_to_image(features['positive_depth_image'], standardize=False)
+    object_image = convert_string_to_image(features['object_image'], standardize=False)
 
     return (object_image, rgb_descriptor, pos_depth_image, negative_depth_image), object_class
 
 
-def convert_string_to_image(image_string):
+def convert_string_to_image(image_string, standardize=True):
     """
     Converts image string extracted from TFRecord to an image
 
     :param image_string: String that represents an image
+    :param standardize: If the image should be standardized or not
     :return: The image represented by the string
     """
     greyscale_size = tf.constant(50176)
@@ -231,11 +242,15 @@ def convert_string_to_image(image_string):
     image_shape = tf.cond(shape_pred, lambda: tf.stack([IMAGE_SIZE, IMAGE_SIZE, 1]),
                           lambda: tf.stack([IMAGE_SIZE, IMAGE_SIZE, 3]))
 
+    print("Within Convert String")
     input_image = tf.reshape(image, image_shape)
 
     channel_pred = tf.cast(tf.equal(tf.shape(input_image)[2], greyscale_channel), tf.bool)
     input_image = tf.cond(channel_pred, lambda: tf.image.grayscale_to_rgb(input_image), lambda: input_image)
     input_image = tf.reshape(input_image, (224, 224, 3))
+
+    if standardize:
+        input_image = tf.image.per_image_standardization(input_image)
 
     return input_image
 

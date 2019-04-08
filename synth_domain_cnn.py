@@ -111,21 +111,22 @@ def tfrecord_parser(serialized_example):
         }
     )
 
-    key = np.random.choice(potential_keys[:3])
-    negative_depth_image = convert_string_to_image(features[key])
-    pos_depth_image = convert_string_to_image(features['positive_depth_image'])
-
     object_class = features['object_class']
     rgb_descriptor = tf.cast(features['rgb_descriptor'], tf.float32)
+
+    key = np.random.choice(potential_keys[:3])
+    negative_depth_image = convert_string_to_image(features[key], standardize=False)
+    pos_depth_image = convert_string_to_image(features['positive_depth_image'], standardize=False)
 
     return (rgb_descriptor, pos_depth_image, negative_depth_image), object_class
 
 
-def convert_string_to_image(image_string):
+def convert_string_to_image(image_string, standardize=True):
     """
     Converts image string extracted from TFRecord to an image
 
     :param image_string: String that represents an image
+    :param standardize: If the image should be standardized or not
     :return: The image represented by the string
     """
     greyscale_size = tf.constant(50176)
@@ -146,12 +147,15 @@ def convert_string_to_image(image_string):
     input_image = tf.cond(channel_pred, lambda: tf.image.grayscale_to_rgb(input_image), lambda: input_image)
     input_image = tf.reshape(input_image, (224, 224, 3))
 
+    if standardize:
+        input_image = tf.image.per_image_standardization(input_image)
+
     return input_image
 
 
 def dataset_base(dataset, shuffle=True):
     if shuffle:
-        dataset = dataset.shuffle(buffer_size=5000)
+        dataset = dataset.shuffle(buffer_size=1000)
 
     dataset = dataset.map(map_func=tfrecord_parser, num_parallel_calls=NUM_CPU_CORES)  # Parallelize data transformation
     dataset.apply(tf.contrib.data.ignore_errors())
