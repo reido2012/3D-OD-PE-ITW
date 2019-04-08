@@ -12,7 +12,7 @@ def main(json_file_name, model_dir):
     global MODEL_DIR
     MODEL_DIR = model_dir
 
-    full_pose_space_db = {}
+    full_pose_space_db = dict({})
 
     synth_domain_cnn = tf.estimator.Estimator(
         model_fn=synth_domain_cnn_model_fn_predict,
@@ -34,13 +34,15 @@ def main(json_file_name, model_dir):
         descriptor_info = {
             "cad_index": cad_index,
             "object_class": object_class,
-            "rot_x": rot_x,
-            "rot_y": rot_y,
-            "rot_z": rot_z,
             "depth_image_path": depth_image_path
         }
 
-        full_pose_space_db[depth_emb] = descriptor_info
+        viewpoint = (rot_x, rot_y, rot_z)
+
+        if viewpoint in full_pose_space_db:
+            full_pose_space_db[viewpoint][depth_emb] = descriptor_info
+        else:
+            full_pose_space_db[viewpoint] = {depth_emb: descriptor_info}
 
     with open(json_file_name + '.json', 'w') as fp:
         json.dump(full_pose_space_db, fp, indent=4)
