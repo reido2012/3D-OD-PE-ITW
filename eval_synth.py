@@ -42,7 +42,6 @@ def visualize_embeddings(tfrecords_file):
 
         all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(tfrecords_file))
 
-        # TODO: Try displaying only positive depth embeddings
         pos_embeddings = np.zeros((BATCH_SIZE, 2048))
         pos_depth_images = np.zeros((BATCH_SIZE, 224, 224, 3))
 
@@ -66,13 +65,19 @@ def visualize_embeddings(tfrecords_file):
 
         tf.get_default_graph()._unsafe_unfinalize()
 
+        all_embeddings = np.vstack(pos_embeddings, neg_embeddings)
+        all_images = np.vstack(pos_depth_images, neg_depth_images)
+
         create_sprite(pos_depth_images, "pos_depth_sprite.png")
         tf.logging.info("Positive Embeddings shape: {}".format(pos_embeddings.shape))
         create_sprite(pos_depth_images, "neg_depth_sprite.png")
         tf.logging.info("Negative Embeddings shape: {}".format(neg_embeddings.shape))
+        create_sprite(all_images, "all_depth_sprite.png")
+        tf.logging.info("All Embeddings shape: {}".format(all_embeddings.shape))
 
         pos_embedding_var = tf.Variable(pos_embeddings, name='pos_depth')
         neg_embedding_var = tf.Variable(pos_embeddings, name='neg_depth')
+        all_embedding_var = tf.Variable(all_embeddings, name='all_depth')
 
         eval_dir = os.path.join(MODEL_DIR, "eval")
         summary_writer = tf.summary.FileWriter(eval_dir)
@@ -88,6 +93,11 @@ def visualize_embeddings(tfrecords_file):
         neg_embedding.tensor_name = neg_embedding_var.name
         neg_embedding.sprite.image_path = "neg_depth_sprite.png"
         neg_embedding.sprite.single_image_dim.extend([224, 224])
+
+        all_embedding = config.embeddings.add()
+        all_embedding.tensor_name = all_embedding_var.name
+        all_embedding.sprite.image_path = "all_depth_sprite.png"
+        all_embedding.sprite.single_image_dim.extend([224, 224])
 
         # Say that you want to visualise the embeddings
         projector.visualize_embeddings(summary_writer, config)
