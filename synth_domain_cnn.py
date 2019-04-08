@@ -54,7 +54,7 @@ def synth_domain_cnn_model_fn(features, labels, mode):
         learning_rate = tf.train.exponential_decay(
             learning_rate=STARTING_LR,
             global_step=global_step,
-            decay_steps=23206,
+            decay_steps=20006,
             decay_rate=0.1,
             staircase=True,
             name="learning_rate"
@@ -155,7 +155,7 @@ def convert_string_to_image(image_string, standardize=True):
 
 def dataset_base(dataset, shuffle=True):
     if shuffle:
-        dataset = dataset.shuffle(buffer_size=1000)
+        dataset = dataset.shuffle(buffer_size=5000)
 
     dataset = dataset.map(map_func=tfrecord_parser, num_parallel_calls=NUM_CPU_CORES)  # Parallelize data transformation
     dataset.apply(tf.contrib.data.ignore_errors())
