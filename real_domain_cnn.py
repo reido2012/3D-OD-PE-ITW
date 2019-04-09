@@ -275,12 +275,12 @@ def main(model_dir):
         tensors_to_log = {"logits": "2d_predictions", "learning_rate": "learning_rate", }
         logging_hook = tf.train.LoggingTensorHook(tensors=tensors_to_log, every_n_iter=100)
         
-        #real_domain_cnn.train(input_fn=train_input_fn, hooks=[logging_hook])
+        real_domain_cnn.train(input_fn=train_input_fn, hooks=[logging_hook])
         
-        train_spec = tf.estimator.TrainSpec(input_fn=train_input_fn, hooks=[logging_hook])
-        eval_spec = tf.estimator.EvalSpec(input_fn=eval_input_fn)
-
-        tf.estimator.train_and_evaluate(real_domain_cnn, train_spec, eval_spec)
+        # train_spec = tf.estimator.TrainSpec(input_fn=train_input_fn, hooks=[logging_hook])
+        # eval_spec = tf.estimator.EvalSpec(input_fn=eval_input_fn)
+        #
+        # tf.estimator.train_and_evaluate(real_domain_cnn, train_spec, eval_spec)
 
         # acc_pi_6, med_error = run_eval(model_dir)
         # logging.debug("ACC PI/6: " + acc_pi_6 + " | Med Error: " + str(med_error) + " | Epochs Elapsed: " + str(40))
