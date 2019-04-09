@@ -87,7 +87,7 @@ def real_domain_cnn_model_fn(features, labels, mode):
         learning_rate = tf.train.exponential_decay(
             learning_rate=STARTING_LR,
             global_step=global_step,
-            decay_steps=46000,
+            decay_steps=23000,
             decay_rate=0.1,
             staircase=True,
             name="learning_rate"
@@ -142,7 +142,7 @@ def train_input_fn():
     """
     dataset = tf.data.TFRecordDataset(TRAINING_TFRECORDS)
     dataset = dataset_base(dataset)
-    dataset = dataset.repeat(count=50)  # Train for count epochs
+    dataset = dataset.repeat(count=40)  # Train for count epochs
 
     iterator = dataset.make_one_shot_iterator()
     features, labels = iterator.get_next()
