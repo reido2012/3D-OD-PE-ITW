@@ -48,6 +48,7 @@ def real_domain_cnn_model_fn(features, labels, mode):
 
     image_descriptors = tf.identity(image_descriptors, name="image_descriptors")
 
+    image_descriptors = tf.layers.dropout(image_descriptors, training=True)
     # Add a dense layer to get the 19 neuron linear output layer
     logits = tf.layers.dense(image_descriptors, 19)
     logits = tf.squeeze(logits, name='2d_predictions')
@@ -142,7 +143,7 @@ def train_input_fn():
     """
     dataset = tf.data.TFRecordDataset(TRAINING_TFRECORDS)
     dataset = dataset_base(dataset)
-    dataset = dataset.repeat(count=4)  # Train for count epochs
+    dataset = dataset.repeat(count=50)  # Train for count epochs
 
     iterator = dataset.make_one_shot_iterator()
     features, labels = iterator.get_next()
@@ -258,7 +259,7 @@ def make_gauss_var(name, size, sigma, c_i):
 
 
 @click.command()
-@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/models/diss_test_1",
+@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/models/diss_test_2",
               help='Path to model to evaluate')
 def main(model_dir):
     # Create your own input function - https://www.tensorflow.org/guide/custom_estimators
