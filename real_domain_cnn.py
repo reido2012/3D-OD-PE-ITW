@@ -142,7 +142,7 @@ def train_input_fn():
     """
     dataset = tf.data.TFRecordDataset(TRAINING_TFRECORDS)
     dataset = dataset_base(dataset)
-    dataset = dataset.repeat(count=40)  # Train for count epochs
+    dataset = dataset.repeat(count=4)  # Train for count epochs
 
     iterator = dataset.make_one_shot_iterator()
     features, labels = iterator.get_next()
