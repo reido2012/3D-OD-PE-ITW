@@ -48,7 +48,7 @@ def real_domain_cnn_model_fn(features, labels, mode):
 
     image_descriptors = tf.identity(image_descriptors, name="image_descriptors")
 
-    image_descriptors = tf.layers.dropout(image_descriptors, training=True)
+    image_descriptors = tf.layers.dropout(image_descriptors, rate=0.2, training=True)
     # Add a dense layer to get the 19 neuron linear output layer
     logits = tf.layers.dense(image_descriptors, 19)
     logits = tf.squeeze(logits, name='2d_predictions')
@@ -235,7 +235,7 @@ def gauss_kernel(kernlen=21, nsig=3, channels=1):
     kernel = kernel_raw / tf.reduce_sum(kernel_raw)
     out_filter = np.array(kernel, dtype = np.float32)
     out_filter = out_filter.reshape((kernlen, kernlen, 1, 1))
-    out_filter = np.repeat(out_filter, channels, axis = 2)
+    out_filter = np.repeat(out_filter, channels, axis=2)
     out_filter = tf.convert_to_tensor(out_filter, dtype=tf.float32)
     return out_filter
 
@@ -259,7 +259,7 @@ def make_gauss_var(name, size, sigma, c_i):
 
 
 @click.command()
-@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/models/diss_test_2",
+@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/models/diss_test_3",
               help='Path to model to evaluate')
 def main(model_dir):
     # Create your own input function - https://www.tensorflow.org/guide/custom_estimators
