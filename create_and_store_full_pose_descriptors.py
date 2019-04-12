@@ -20,6 +20,8 @@ def main(json_file_name, model_dir):
             model_dir=model_dir
         )
         all_image_paths = list(glob.glob("/home/omarreid/selerio/datasets/full_pose_space/*/*/*_0001.png"))
+        print("Num Image Paths")
+        print(len(all_image_paths))
         path_ds = tf.data.Dataset.from_tensor_slices(all_image_paths)
         image_ds = path_ds.map(record_maker)
 
