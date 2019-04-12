@@ -50,7 +50,7 @@ def main(json_file_name, model_dir):
 
 def record_maker(depth_image_path):
     depth_image = convert_string_to_image(tf.read_file(depth_image_path), standardize=False)
-    return depth_image, depth_image_path
+    return depth_image, tf.constant(depth_image_path, dtype=tf.string)
 
 
 def predict_input_fn(path_ds):
@@ -95,14 +95,14 @@ def convert_string_to_image(image_string, standardize=True):
 
 def synth_domain_cnn_model_fn_predict(features, labels, mode):
     depth_images = features
+    print(labels.shape)
     depth_image_paths = labels
-    print(depth_images.shape)
+
     with tf.variable_scope('synth_domain'):
         with slim.arg_scope(resnet_v1.resnet_arg_scope()):
             # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
             network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=True)
-            depth_descriptors, endpoints = network_fn(depth_images)
-            # _, _ = network_fn(depth_images, reuse=tf.AUTO_REUSE)
+            depth_descriptors, endpoints = network_fn(depth_images, reuse=tf.AUTO_REUSE)
 
     variables_to_restore = slim.get_variables_to_restore(include=['synth_domain'])
 
