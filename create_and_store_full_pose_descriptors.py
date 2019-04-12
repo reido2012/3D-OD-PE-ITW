@@ -26,6 +26,12 @@ def main(json_file_name, model_dir):
         print(len(all_image_paths))
         print(all_image_paths[0])
         path_ds = tf.data.Dataset.from_tensor_slices(all_image_paths)
+
+        print('shape: ', repr(path_ds.output_shapes))
+        print('type: ', path_ds.output_types)
+        print()
+        print(path_ds)
+
         image_ds = path_ds.map(record_maker)
 
         print(path_ds.take(1))
