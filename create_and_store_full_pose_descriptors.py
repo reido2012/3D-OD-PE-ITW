@@ -50,7 +50,9 @@ def main(json_file_name, model_dir):
 
 def record_maker(depth_image_path):
     depth_image = convert_string_to_image(tf.read_file(depth_image_path), standardize=False)
-    return depth_image, tf.constant(depth_image_path, dtype=tf.string)
+    print("Depth Image Path")
+    print(depth_image_path)
+    return depth_image, tf.convert_to_tensor(depth_image_path, dtype=tf.string)
 
 
 def predict_input_fn(path_ds):
