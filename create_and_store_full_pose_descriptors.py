@@ -50,7 +50,15 @@ def main(json_file_name, model_dir):
 
 def record_maker(depth_image_path):
     depth_image = convert_string_to_image(tf.read_file(depth_image_path), standardize=False)
-    return depth_image,  depth_image_path
+    return depth_image, depth_image_path
+
+
+def predict_input_fn(path_ds):
+    dataset = path_ds.map(lambda x: record_maker(x))
+    dataset = dataset.batch(50)
+    iterator = dataset.make_one_shot_iterator()
+    features, image_paths = iterator.get_next()
+    return features, image_paths
 
 
 def convert_string_to_image(image_string, standardize=True):
@@ -85,19 +93,10 @@ def convert_string_to_image(image_string, standardize=True):
     return input_image
 
 
-def predict_input_fn(path_ds):
-    dataset = path_ds.map(lambda x: record_maker(x))
-    iterator = dataset.make_one_shot_iterator()
-    features, image_path = iterator.get_next()
-    return features, image_path
-
-
 def synth_domain_cnn_model_fn_predict(features, labels, mode):
-    print(features)
-    print(labels)
     depth_images = features
     depth_image_paths = labels
-
+    print(depth_images.shape)
     with tf.variable_scope('synth_domain'):
         with slim.arg_scope(resnet_v1.resnet_arg_scope()):
             # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
