@@ -51,16 +51,46 @@ def main(json_file_name, model_dir):
 def record_maker(depth_image_path):
     depth_image = convert_string_to_image(tf.read_file(depth_image_path), standardize=False)
     print("Depth Image Path")
+    depth_image_path = tf.convert_to_tensor(depth_image_path, dtype=tf.string)
     print(depth_image_path)
-    return depth_image, tf.convert_to_tensor(depth_image_path, dtype=tf.string)
+    print(depth_image_path.shape)
+
+    return depth_image, depth_image_path
 
 
 def predict_input_fn(path_ds):
     dataset = path_ds.map(lambda x: record_maker(x))
-    dataset = dataset.batch(50)
+    dataset = dataset.batch(batch_size=50)
     iterator = dataset.make_one_shot_iterator()
     features, image_paths = iterator.get_next()
     return features, image_paths
+
+
+def synth_domain_cnn_model_fn_predict(features, labels, mode):
+    depth_images = features
+    depth_image_paths = labels
+
+    with tf.variable_scope('synth_domain'):
+        with slim.arg_scope(resnet_v1.resnet_arg_scope()):
+            # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
+            network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=True)
+            depth_descriptors, endpoints = network_fn(depth_images, reuse=tf.AUTO_REUSE)
+
+    variables_to_restore = slim.get_variables_to_restore(include=['synth_domain'])
+
+    checkpoint_path = tf.train.latest_checkpoint(MODEL_DIR)
+    variables_to_restore = [v for v in variables_to_restore if 'resnet_v1_50/' in v.name]
+    tf.train.init_from_checkpoint(checkpoint_path,
+                                  {v.name.split(':')[0]: v.name.split(':')[0] for v in variables_to_restore})
+
+    predictions = {
+        # Generate predictions (for PREDICT and EVAL mode)
+        "depth_embeddings": depth_descriptors,
+        "depth_image_paths": depth_image_paths
+    }
+
+    if mode == tf.estimator.ModeKeys.PREDICT:
+        return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
 
 
 def convert_string_to_image(image_string, standardize=True):
@@ -93,34 +123,6 @@ def convert_string_to_image(image_string, standardize=True):
         input_image = tf.image.per_image_standardization(input_image)
 
     return input_image
-
-
-def synth_domain_cnn_model_fn_predict(features, labels, mode):
-    depth_images = features
-    print(labels.shape)
-    depth_image_paths = labels
-
-    with tf.variable_scope('synth_domain'):
-        with slim.arg_scope(resnet_v1.resnet_arg_scope()):
-            # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
-            network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=True)
-            depth_descriptors, endpoints = network_fn(depth_images, reuse=tf.AUTO_REUSE)
-
-    variables_to_restore = slim.get_variables_to_restore(include=['synth_domain'])
-
-    checkpoint_path = tf.train.latest_checkpoint(MODEL_DIR)
-    variables_to_restore = [v for v in variables_to_restore if 'resnet_v1_50/' in v.name]
-    tf.train.init_from_checkpoint(checkpoint_path,
-                                  {v.name.split(':')[0]: v.name.split(':')[0] for v in variables_to_restore})
-
-    predictions = {
-        # Generate predictions (for PREDICT and EVAL mode)
-        "depth_embeddings": depth_descriptors,
-        "depth_image_paths": depth_image_paths
-    }
-
-    if mode == tf.estimator.ModeKeys.PREDICT:
-        return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
 
 
 if __name__ == '__main__':
