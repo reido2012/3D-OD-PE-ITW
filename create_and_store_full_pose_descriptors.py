@@ -49,8 +49,40 @@ def main(json_file_name, model_dir):
 
 
 def record_maker(depth_image_path):
-    depth_image = tf.image.decode_image(tf.read_file(depth_image_path), channels=3)
+    depth_image = convert_string_to_image(tf.read_file(depth_image_path), standardize=False)
     return depth_image,  depth_image_path
+
+
+def convert_string_to_image(image_string, standardize=True):
+    """
+    Converts image string extracted from TFRecord to an image
+
+    :param image_string: String that represents an image
+    :param standardize: If the image should be standardized or not
+    :return: The image represented by the string
+    """
+    greyscale_size = tf.constant(50176)
+    greyscale_channel = tf.constant(1)
+
+    image = tf.decode_raw(image_string, tf.uint8)
+    image = tf.to_float(image)
+
+    # Image is not in correct shape so
+    shape_pred = tf.cast(tf.equal(tf.size(image), greyscale_size), tf.bool)
+    image_shape = tf.cond(shape_pred, lambda: tf.stack([224, 224, 1]),
+                          lambda: tf.stack([224, 224, 3]))
+
+    print("Within Convert String")
+    input_image = tf.reshape(image, image_shape)
+
+    channel_pred = tf.cast(tf.equal(tf.shape(input_image)[2], greyscale_channel), tf.bool)
+    input_image = tf.cond(channel_pred, lambda: tf.image.grayscale_to_rgb(input_image), lambda: input_image)
+    input_image = tf.reshape(input_image, (224, 224, 3))
+
+    if standardize:
+        input_image = tf.image.per_image_standardization(input_image)
+
+    return input_image
 
 
 def predict_input_fn(path_ds):
