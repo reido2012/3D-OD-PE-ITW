@@ -51,10 +51,10 @@ def main(json_file_name, model_dir):
 def record_maker(depth_image_path):
     depth_image = tf.image.decode_png(tf.read_file(depth_image_path))
 
-    object_class = tf.string_split(depth_image_path, "/")[-3]
-    cad_index = tf.string_split(depth_image_path, "/")[-2]
-    rotation_info_str = tf.string_split(depth_image_path, "/")[-1][:-9]
-    rot_x, rot_y, rot_z = np.array(tf.string_split(rotation_info_str, "_"))[1, 3, 5]
+    object_class = tf.string_split([depth_image_path], "/")[-3]
+    cad_index = tf.string_split([depth_image_path], "/")[-2]
+    rotation_info_str = tf.string_split([depth_image_path], "/")[-1][:-9]
+    rot_x, rot_y, rot_z = np.array(tf.string_split([rotation_info_str], "_"))[1, 3, 5]
     return (depth_image, object_class, cad_index),  (rot_x, rot_y, rot_z, depth_image_path)
 
 
