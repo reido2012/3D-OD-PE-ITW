@@ -20,7 +20,7 @@ def main(json_file_name, model_dir):
         )
 
         filename_dataset = tf.data.Dataset.list_files("/home/omarreid/selerio/datasets/full_pose_space/*/*/*_0001.png")
-        all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(filename_dataset))
+        all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(filename_dataset), yield_single_examples=True)
 
         for counter, prediction in enumerate(all_model_predictions):
             depth_emb = tuple(prediction["depth_embeddings"].squeeze())
