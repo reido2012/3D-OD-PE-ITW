@@ -19,7 +19,7 @@ def main(json_file_name, model_dir):
             model_fn=synth_domain_cnn_model_fn_predict,
             model_dir=model_dir
         )
-        all_image_paths = glob.glob("/home/omarreid/selerio/datasets/full_pose_space/*/*/*_0001.png")
+        all_image_paths = list(glob.glob("/home/omarreid/selerio/datasets/full_pose_space/*/*/*_0001.png"))
         path_ds = tf.data.Dataset.from_tensor_slices(all_image_paths)
         image_ds = path_ds.map(record_maker, num_parallel_calls=4)
         dataset = tf.data.Dataset.zip((image_ds, path_ds))
