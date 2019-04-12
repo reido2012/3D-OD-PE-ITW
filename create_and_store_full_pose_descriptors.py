@@ -23,6 +23,7 @@ def main(json_file_name, model_dir):
         all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(filename_dataset), yield_single_examples=True)
 
         for counter, prediction in enumerate(all_model_predictions):
+            print(prediction)
             depth_emb = tuple(prediction["depth_embeddings"].squeeze())
             print(depth_emb)
             depth_image_path = prediction["depth_image_paths"]
