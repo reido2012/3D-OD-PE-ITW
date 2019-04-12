@@ -21,7 +21,11 @@ def main(json_file_name, model_dir):
         )
         all_image_paths = list(glob.glob("/home/omarreid/selerio/datasets/full_pose_space/*/*/*_0001.png"))
         path_ds = tf.data.Dataset.from_tensor_slices(all_image_paths)
-        image_ds = path_ds.map(record_maker, num_parallel_calls=4)
+        image_ds = path_ds.map(record_maker)
+
+        print(path_ds.take(1))
+        print(image_ds.take(1))
+
         dataset = tf.data.Dataset.zip((image_ds, path_ds))
 
         all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(dataset), yield_single_examples=True)
@@ -69,6 +73,7 @@ def predict_input_fn(dataset):
 
 def synth_domain_cnn_model_fn_predict(features, labels, mode):
     depth_images = features
+    print(features.shape)
     depth_image_paths = labels
 
     with tf.variable_scope('synth_domain'):
@@ -85,7 +90,6 @@ def synth_domain_cnn_model_fn_predict(features, labels, mode):
                                   {v.name.split(':')[0]: v.name.split(':')[0] for v in variables_to_restore})
 
     predictions = {
-        # Generate predictions (for PREDICT and EVAL mode)
         "depth_embeddings": depth_descriptors,
         "depth_image_paths": depth_image_paths
     }
@@ -113,7 +117,6 @@ def convert_string_to_image(image_string, standardize=True):
     image_shape = tf.cond(shape_pred, lambda: tf.stack([224, 224, 1]),
                           lambda: tf.stack([224, 224, 3]))
 
-    print("Within Convert String")
     input_image = tf.reshape(image, image_shape)
 
     channel_pred = tf.cast(tf.equal(tf.shape(input_image)[2], greyscale_channel), tf.bool)
