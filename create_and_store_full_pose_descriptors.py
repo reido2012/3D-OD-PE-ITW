@@ -24,12 +24,12 @@ def main(json_file_name, model_dir):
 
         for counter, prediction in enumerate(all_model_predictions):
             depth_emb = tuple(prediction["depth_embeddings"].squeeze())
-            object_class = prediction["object_class"]
-            cad_index = prediction["cad_index"]
-            rot_x = prediction["rot_x"]
-            rot_y = prediction["rot_y"]
-            rot_z = prediction["rot_z"]
             depth_image_path = prediction["depth_image_path"]
+
+            object_class = depth_image_path.split("/")[-3]
+            cad_index = depth_image_path.split("/")[-2]
+            rotation_info_str = depth_image_path.split("/")[-1][:-9]
+            rot_x, rot_y, rot_z = np.array(rotation_info_str.split("_"))[1, 3, 5]
 
             descriptor_info = {
                 "cad_index": cad_index,
@@ -50,24 +50,19 @@ def main(json_file_name, model_dir):
 
 def record_maker(depth_image_path):
     depth_image = tf.image.decode_png(tf.read_file(depth_image_path))
-
-    object_class = tf.string_split([depth_image_path], "/").values[-3]
-    cad_index = tf.string_split([depth_image_path], "/").values[-2]
-    rotation_info_str = tf.string_split([depth_image_path], "/").values[-1][:-9]
-    rot_x, rot_y, rot_z = np.array(tf.string_split([rotation_info_str], "_").values)[1, 3, 5]
-    return (depth_image, object_class, cad_index),  (rot_x, rot_y, rot_z, depth_image_path)
+    return depth_image,  depth_image_path
 
 
 def predict_input_fn(path_ds):
     dataset = path_ds.map(lambda x: record_maker(x))
     iterator = dataset.make_one_shot_iterator()
-    features, orientation = iterator.get_next()
-    return features, orientation
+    features, image_path = iterator.get_next()
+    return features, image_path
 
 
 def synth_domain_cnn_model_fn_predict(features, labels, mode):
-    depth_images, object_class, cad_index = features
-    rot_x, rot_y, rot_z, depth_image_path = labels
+    depth_images = features
+    depth_image_paths = labels
 
     with tf.variable_scope('synth_domain'):
         with slim.arg_scope(resnet_v1.resnet_arg_scope()):
@@ -85,12 +80,7 @@ def synth_domain_cnn_model_fn_predict(features, labels, mode):
     predictions = {
         # Generate predictions (for PREDICT and EVAL mode)
         "depth_embeddings": depth_descriptors,
-        "object_class": object_class,
-        "cad_index": cad_index,
-        "rot_x": rot_x,
-        "rot_y": rot_y,
-        "rot_z": rot_z,
-        "depth_image_path": depth_image_path
+        "depth_image_path": depth_image_paths
     }
 
     if mode == tf.estimator.ModeKeys.PREDICT:
