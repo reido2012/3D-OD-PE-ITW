@@ -1,7 +1,6 @@
 import tensorflow as tf
 import json
 import numpy as np
-
 from nets import nets_factory, resnet_v1
 NETWORK_NAME = 'resnet_v1_50'
 MODEL_DIR = ""
@@ -14,35 +13,36 @@ def main(json_file_name, model_dir):
 
     full_pose_space_db = dict({})
 
-    synth_domain_cnn = tf.estimator.Estimator(
-        model_fn=synth_domain_cnn_model_fn_predict,
-        model_dir=model_dir
-    )
+    with tf.device("/device:GPU:0"):
+        synth_domain_cnn = tf.estimator.Estimator(
+            model_fn=synth_domain_cnn_model_fn_predict,
+            model_dir=model_dir
+        )
 
-    filename_dataset = tf.data.Dataset.list_files("/home/omarreid/selerio/datasets/full_pose_space/*/*/*_0001.png")
-    all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(filename_dataset))
+        filename_dataset = tf.data.Dataset.list_files("/home/omarreid/selerio/datasets/full_pose_space/*/*/*_0001.png")
+        all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(filename_dataset))
 
-    for counter, prediction in enumerate(all_model_predictions):
-        depth_emb = tuple(prediction["depth_embeddings"].squeeze())
-        object_class = prediction["object_class"]
-        cad_index = prediction["cad_index"]
-        rot_x = prediction["rot_x"]
-        rot_y = prediction["rot_y"]
-        rot_z = prediction["rot_z"]
-        depth_image_path = prediction["depth_image_path"]
+        for counter, prediction in enumerate(all_model_predictions):
+            depth_emb = tuple(prediction["depth_embeddings"].squeeze())
+            object_class = prediction["object_class"]
+            cad_index = prediction["cad_index"]
+            rot_x = prediction["rot_x"]
+            rot_y = prediction["rot_y"]
+            rot_z = prediction["rot_z"]
+            depth_image_path = prediction["depth_image_path"]
 
-        descriptor_info = {
-            "cad_index": cad_index,
-            "object_class": object_class,
-            "depth_image_path": depth_image_path
-        }
+            descriptor_info = {
+                "cad_index": cad_index,
+                "object_class": object_class,
+                "depth_image_path": depth_image_path
+            }
 
-        viewpoint = (rot_x, rot_y, rot_z)
+            viewpoint = (rot_x, rot_y, rot_z)
 
-        if viewpoint in full_pose_space_db:
-            full_pose_space_db[viewpoint][depth_emb] = descriptor_info
-        else:
-            full_pose_space_db[viewpoint] = {depth_emb: descriptor_info}
+            if viewpoint in full_pose_space_db:
+                full_pose_space_db[viewpoint][depth_emb] = descriptor_info
+            else:
+                full_pose_space_db[viewpoint] = {depth_emb: descriptor_info}
 
     with open(json_file_name + '.json', 'w') as fp:
         json.dump(full_pose_space_db, fp, indent=4)
