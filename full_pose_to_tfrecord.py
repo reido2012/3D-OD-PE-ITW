@@ -63,3 +63,7 @@ def floats_feature(value):
 
 def bytes_list_feature(value):
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=value))
+
+
+if __name__ == '__main__':
+    main()
