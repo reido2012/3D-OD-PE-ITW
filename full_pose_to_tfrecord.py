@@ -20,14 +20,7 @@ def main():
             object_class = image_path.split("/")[-3]
             cad_index = image_path.split("/")[-2]
             rotation_info_str = image_path.split("/")[-1][:-9]
-            rot_x, rot_y, rot_z = np.array(rotation_info_str.split("_"))[1, 3, 5]
-            print("Image Path: ")
-            print(image_path)
-
-            print(f"Object Class: {object_class}")
-            print(f"Cad Index: {cad_index}")
-            print(f"Rotation: {(rot_x, rot_y, rot_z)}")
-            return
+            rot_x, rot_y, rot_z = np.array(rotation_info_str.split("_"))[[1, 3, 5]]
             write_record(writer, depth_image, object_class, cad_index, rot_x, rot_y, rot_z)
 
         writer.close()
@@ -40,9 +33,9 @@ def write_record(record_writer, depth_image, object_class, cad_index, rot_x, rot
         'depth_image': bytes_feature(depth_img_raw),
         'object_class': bytes_feature(object_class.encode('utf-8')),
         'cad_index': bytes_feature(cad_index.encode('utf-8')),
-        'rot_x': floats_feature(rot_x),
-        'rot_y': floats_feature(rot_y),
-        'rot_z': floats_feature(rot_z)
+        'rot_x': bytes_feature(rot_x.encode('utf-8')),
+        'rot_y': bytes_feature(rot_y.encode('utf-8')),
+        'rot_z': bytes_feature(rot_z.encode('utf-8'))
     }
 
     example = tf.train.Example(features=tf.train.Features(feature=feature))
