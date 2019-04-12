@@ -21,9 +21,10 @@ def main(json_file_name, model_dir):
 
         filename_dataset = tf.data.Dataset.list_files("/home/omarreid/selerio/datasets/full_pose_space/*/*/*_0001.png")
         all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(filename_dataset), yield_single_examples=True)
-
+        print(all_model_predictions[0])
         for counter, prediction in enumerate(all_model_predictions):
             depth_emb = tuple(prediction["depth_embeddings"].squeeze())
+            print(depth_emb)
             depth_image_path = prediction["depth_image_paths"]
 
             object_class = depth_image_path.split("/")[-3]
@@ -56,15 +57,17 @@ def record_maker(depth_image_path):
     print(depth_image_path)
     print(depth_image_path.shape)
 
-    return depth_image, depth_image_path
+    return depth_image
 
 
 def predict_input_fn(path_ds):
-
     dataset = path_ds.map(map_func=lambda x: record_maker(x))
+    dataset = tf.data.Dataset.zip((dataset, path_ds))
     dataset = dataset.batch(batch_size=50)
     iterator = dataset.make_one_shot_iterator()
     features, image_paths = iterator.get_next()
+    print(features)
+    print(image_paths)
     return features, image_paths
 
 
