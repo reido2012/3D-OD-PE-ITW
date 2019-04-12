@@ -3,6 +3,7 @@ import json
 import numpy as np
 import glob
 import scipy.misc
+from tqdm import tqdm
 import pathlib
 from nets import nets_factory, resnet_v1
 NETWORK_NAME = 'resnet_v1_50'
@@ -14,7 +15,7 @@ def main():
     with tf.device("/device:GPU:0"):
         writer = tf.python_io.TFRecordWriter("/home/omarreid/selerio/datasets/full_pose_space.tfrecords")
 
-        for image_path in glob.glob("/home/omarreid/selerio/datasets/full_pose_space/./*/*/*_0001.png"):
+        for image_path in tqdm(glob.glob("/home/omarreid/selerio/datasets/full_pose_space/./*/*/*_0001.png")):
             depth_image = scipy.misc.imread(image_path, mode='RGB')
             depth_image = scipy.misc.imresize(depth_image, (224, 224, 3))
             object_class = image_path.split("/")[-3]
