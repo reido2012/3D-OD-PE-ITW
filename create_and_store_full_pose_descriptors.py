@@ -1,6 +1,7 @@
 import tensorflow as tf
 import json
 import numpy as np
+import glob
 from nets import nets_factory, resnet_v1
 NETWORK_NAME = 'resnet_v1_50'
 MODEL_DIR = ""
@@ -18,9 +19,12 @@ def main(json_file_name, model_dir):
             model_fn=synth_domain_cnn_model_fn_predict,
             model_dir=model_dir
         )
+        all_image_paths = glob.glob("/home/omarreid/selerio/datasets/full_pose_space/*/*/*_0001.png")
+        path_ds = tf.data.Dataset.from_tensor_slices(all_image_paths)
+        image_ds = path_ds.map(record_maker, num_parallel_calls=4)
+        dataset = tf.data.Dataset.zip((image_ds, path_ds))
 
-        filename_dataset = tf.data.Dataset.list_files("/home/omarreid/selerio/datasets/full_pose_space/*/*/*_0001.png")
-        all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(filename_dataset), yield_single_examples=True)
+        all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(dataset), yield_single_examples=True)
 
         for counter, prediction in enumerate(all_model_predictions):
             print(prediction)
@@ -52,23 +56,14 @@ def main(json_file_name, model_dir):
 
 def record_maker(depth_image_path):
     depth_image = convert_string_to_image(tf.read_file(depth_image_path), standardize=False)
-    print(depth_image.shape)
-    print("Depth Image Path")
-    depth_image_path = tf.convert_to_tensor(depth_image_path, dtype=tf.string)
-    print(depth_image_path)
-    print(depth_image_path.shape)
-
     return depth_image
 
 
-def predict_input_fn(path_ds):
-    dataset = path_ds.map(map_func=lambda x: record_maker(x))
-    dataset = tf.data.Dataset.zip((dataset, path_ds))
+def predict_input_fn(dataset):
+    dataset.apply(tf.contrib.data.ignore_errors())
     dataset = dataset.batch(batch_size=50)
     iterator = dataset.make_one_shot_iterator()
     features, image_paths = iterator.get_next()
-    print(features)
-    print(image_paths)
     return features, image_paths
 
 
