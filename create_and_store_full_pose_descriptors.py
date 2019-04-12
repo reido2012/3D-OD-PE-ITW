@@ -34,6 +34,12 @@ def main(json_file_name, model_dir):
 
         image_ds = path_ds.map(record_maker)
 
+        print("Image DS")
+        print('shape: ', repr(image_ds.output_shapes))
+        print('type: ', image_ds.output_types)
+        print()
+        print(image_ds)
+
         print(path_ds.take(1))
         print(image_ds.take(1))
 
