@@ -2,6 +2,7 @@ import tensorflow as tf
 import json
 import numpy as np
 import glob
+import pathlib
 from nets import nets_factory, resnet_v1
 NETWORK_NAME = 'resnet_v1_50'
 MODEL_DIR = ""
@@ -19,7 +20,8 @@ def main(json_file_name, model_dir):
             model_fn=synth_domain_cnn_model_fn_predict,
             model_dir=model_dir
         )
-        all_image_paths = list(glob.glob("/home/omarreid/selerio/datasets/full_pose_space/*/*/*_0001.png"))
+        data_root = pathlib.Path("/home/omarreid/selerio/datasets/full_pose_space/")
+        all_image_paths = data_root.glob("./*/*/*_0001.png")
         all_image_paths = [str(path) for path in all_image_paths]
 
         print("Num Image Paths")
@@ -27,6 +29,7 @@ def main(json_file_name, model_dir):
         print(all_image_paths[0])
         path_ds = tf.data.Dataset.from_tensor_slices(all_image_paths)
 
+        print("Path DS")
         print('shape: ', repr(path_ds.output_shapes))
         print('type: ', path_ds.output_types)
         print()
