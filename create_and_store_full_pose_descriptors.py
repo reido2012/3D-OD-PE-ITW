@@ -49,7 +49,7 @@ def main(json_file_name, model_dir):
 
 
 def record_maker(depth_image_path):
-    depth_image = tf.io.decode_image(tf.read_file(depth_image_path), channels=3)
+    depth_image = tf.image.decode_image(tf.read_file(depth_image_path), channels=3)
     return depth_image,  depth_image_path
 
 
