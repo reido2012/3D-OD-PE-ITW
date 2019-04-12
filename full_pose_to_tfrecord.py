@@ -21,18 +21,19 @@ def main():
             cad_index = image_path.split("/")[-2]
             rotation_info_str = image_path.split("/")[-1][:-9]
             rot_x, rot_y, rot_z = np.array(rotation_info_str.split("_"))[[1, 3, 5]]
-            write_record(writer, depth_image, object_class, cad_index, rot_x, rot_y, rot_z)
+            write_record(writer, depth_image, image_path, object_class, cad_index, rot_x, rot_y, rot_z)
 
         writer.close()
 
 
-def write_record(record_writer, depth_image, object_class, cad_index, rot_x, rot_y, rot_z):
+def write_record(record_writer, depth_image, image_path, object_class, cad_index, rot_x, rot_y, rot_z):
 
     depth_img_raw = depth_image.tostring()
     feature = {
         'depth_image': bytes_feature(depth_img_raw),
         'object_class': bytes_feature(object_class.encode('utf-8')),
         'cad_index': bytes_feature(cad_index.encode('utf-8')),
+        'image_path': bytes_feature(image_path.encode('utf-8')),
         'rot_x': bytes_feature(rot_x.encode('utf-8')),
         'rot_y': bytes_feature(rot_y.encode('utf-8')),
         'rot_z': bytes_feature(rot_z.encode('utf-8'))
