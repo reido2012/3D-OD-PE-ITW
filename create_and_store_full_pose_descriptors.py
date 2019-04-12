@@ -24,7 +24,7 @@ def main(json_file_name, model_dir):
 
         for counter, prediction in enumerate(all_model_predictions):
             depth_emb = tuple(prediction["depth_embeddings"].squeeze())
-            depth_image_path = prediction["depth_image_path"]
+            depth_image_path = prediction["depth_image_paths"]
 
             object_class = depth_image_path.split("/")[-3]
             cad_index = depth_image_path.split("/")[-2]
@@ -69,6 +69,7 @@ def synth_domain_cnn_model_fn_predict(features, labels, mode):
             # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
             network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=True)
             depth_descriptors, endpoints = network_fn(depth_images, reuse=tf.AUTO_REUSE)
+            _, _ = network_fn(depth_images, reuse=tf.AUTO_REUSE)
 
     variables_to_restore = slim.get_variables_to_restore(include=['synth_domain'])
 
@@ -80,7 +81,7 @@ def synth_domain_cnn_model_fn_predict(features, labels, mode):
     predictions = {
         # Generate predictions (for PREDICT and EVAL mode)
         "depth_embeddings": depth_descriptors,
-        "depth_image_path": depth_image_paths
+        "depth_image_paths": depth_image_paths
     }
 
     if mode == tf.estimator.ModeKeys.PREDICT:
