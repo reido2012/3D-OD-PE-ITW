@@ -61,12 +61,12 @@ def real_domain_attention_cnn_model_fn(features, labels, mode):
     feature_map = end_points['resnet_v1_50/block4']
 
     with slim.arg_scope([slim.batch_norm], is_training=True):
-        attention_feat, attention_prob, attention_score, end_points = attention_subnetwork(feature_map, end_points,
-                                                                                           attention_type=
-                                                                                           _SUPPORTED_ATTENTION_TYPES[
-                                                                                               0],
-                                                                                           kernel=1,
-                                                                                           reuse=True)
+        _, attention_prob, _, end_points = attention_subnetwork(feature_map, end_points,
+                                                                attention_type=
+                                                                _SUPPORTED_ATTENTION_TYPES[
+                                                                    0],
+                                                                kernel=1,
+                                                                reuse=True)
 
     attention = tf.reshape(attention_prob, [-1])
     feature_map = tf.reshape(feature_map, [-1, 2048])
