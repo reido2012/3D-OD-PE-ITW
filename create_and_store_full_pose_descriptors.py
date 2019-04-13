@@ -8,6 +8,7 @@ NETWORK_NAME = 'resnet_v1_50'
 MODEL_DIR = ""
 slim = tf.contrib.slim
 
+FULL_POSE_TFRECORD = "/home/omarreid/datasets/full_pose_space.tfrecords"
 
 def main(json_file_name, model_dir):
     global MODEL_DIR
@@ -20,51 +21,22 @@ def main(json_file_name, model_dir):
             model_fn=synth_domain_cnn_model_fn_predict,
             model_dir=model_dir
         )
-        data_root = pathlib.Path("/home/omarreid/selerio/datasets/full_pose_space/")
-        all_image_paths = data_root.glob("./*/*/*_0001.png")
-        all_image_paths = [str(path) for path in all_image_paths]
 
-        print("Num Image Paths")
-        print(len(all_image_paths))
-        print(all_image_paths[0])
-        path_ds = tf.data.Dataset.from_tensor_slices(all_image_paths)
-
-        print("Path DS")
-        print('shape: ', repr(path_ds.output_shapes))
-        print('type: ', path_ds.output_types)
-        print()
-        print(path_ds)
-
-        image_ds = path_ds.map(record_maker)
-
-        print("Image DS")
-        print('shape: ', repr(image_ds.output_shapes))
-        print('type: ', image_ds.output_types)
-        print()
-        print(image_ds)
-
-        print(path_ds.take(1))
-        print(image_ds.take(1))
-
-        dataset = tf.data.Dataset.zip((image_ds, path_ds))
-
-        all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(dataset), yield_single_examples=True)
+        all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(FULL_POSE_TFRECORD), yield_single_examples=True)
 
         for counter, prediction in enumerate(all_model_predictions):
-            print(prediction)
             depth_emb = tuple(prediction["depth_embeddings"].squeeze())
-            print(depth_emb)
-            depth_image_path = prediction["depth_image_paths"]
-
-            object_class = depth_image_path.split("/")[-3]
-            cad_index = depth_image_path.split("/")[-2]
-            rotation_info_str = depth_image_path.split("/")[-1][:-9]
-            rot_x, rot_y, rot_z = np.array(rotation_info_str.split("_"))[1, 3, 5]
+            cad_index = prediction["cad_index"]
+            object_class = prediction["object_class"]
+            image_path = prediction["image_path"]
+            rot_x = prediction["rot_x"]
+            rot_y = prediction["rot_y"]
+            rot_z = prediction["rot_z"]
 
             descriptor_info = {
                 "cad_index": cad_index,
                 "object_class": object_class,
-                "depth_image_path": depth_image_path
+                "depth_image_path": image_path
             }
 
             viewpoint = (rot_x, rot_y, rot_z)
@@ -78,23 +50,58 @@ def main(json_file_name, model_dir):
         json.dump(full_pose_space_db, fp, indent=4)
 
 
-def record_maker(depth_image_path):
-    depth_image = convert_string_to_image(tf.read_file(depth_image_path), standardize=False)
-    return depth_image
+def predict_input_fn(tfrecords_file):
+    dataset = tf.data.TFRecordDataset(tfrecords_file)
+    dataset = dataset_base(dataset, shuffle=False)
+
+    iterator = dataset.make_one_shot_iterator()
+    features, labels = iterator.get_next()
+    return features, labels
 
 
-def predict_input_fn(dataset):
+def dataset_base(dataset, shuffle=False):
+    dataset = dataset.map(map_func=tfrecord_parser, num_parallel_calls=8)  # Parallelize data transformation
     dataset.apply(tf.contrib.data.ignore_errors())
     dataset = dataset.batch(batch_size=50)
-    iterator = dataset.make_one_shot_iterator()
-    features, image_paths = iterator.get_next()
-    return features, image_paths
+    return dataset.prefetch(buffer_size=2)
+
+
+def tfrecord_parser(serialized_example):
+    """
+        Parses a single tf.Example into image and label tensors.
+    """
+
+    features = tf.parse_single_example(
+        serialized_example,
+        # Defaults are not specified since both keys are required.
+        features={
+            'depth_image': tf.FixedLenFeature([], tf.string),
+            'object_class': tf.FixedLenFeature([], tf.string),
+            'cad_index': tf.FixedLenFeature([], tf.string),
+            'image_path': tf.FixedLenFeature([], tf.string),
+            'rot_x': tf.FixedLenFeature([], tf.string),
+            'rot_y': tf.FixedLenFeature([], tf.string),
+            'rot_z': tf.FixedLenFeature([], tf.string)
+
+        }
+    )
+
+    object_class = features['object_class']
+    cad_index = features['cad_index']
+    image_path = features['rot_z']
+    rot_x = features['rot_x']
+    rot_y = features['rot_y']
+    rot_z = features['rot_z']
+
+    depth_image = convert_string_to_image(features['depth_image'], standardize=False)
+
+    return depth_image, (object_class, image_path,  cad_index, rot_x, rot_y, rot_z)
 
 
 def synth_domain_cnn_model_fn_predict(features, labels, mode):
     depth_images = features
-    print(features.shape)
-    depth_image_paths = labels
+
+    object_class, image_path,  cad_index, rot_x, rot_y, rot_z = labels
 
     with tf.variable_scope('synth_domain'):
         with slim.arg_scope(resnet_v1.resnet_arg_scope()):
@@ -111,7 +118,12 @@ def synth_domain_cnn_model_fn_predict(features, labels, mode):
 
     predictions = {
         "depth_embeddings": depth_descriptors,
-        "depth_image_paths": depth_image_paths
+        "image_path": image_path,
+        "object_class": object_class,
+        "cad_index": cad_index,
+        "rot_x": rot_x,
+        "rot_y": rot_y,
+        "rot_z": rot_z
     }
 
     if mode == tf.estimator.ModeKeys.PREDICT:
