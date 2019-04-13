@@ -29,6 +29,7 @@ def main(model_dir, tfrecords_file):
     tf.reset_default_graph()
     visualize_embeddings(tfrecords_file)
 
+# TODO: Include data ID so we can quickly retrieve 3d model
 
 def visualize_embeddings(tfrecords_file):
     tf.reset_default_graph()
@@ -48,7 +49,8 @@ def visualize_embeddings(tfrecords_file):
         neg_embeddings = np.zeros((BATCH_SIZE, 2048))
         neg_depth_images = np.zeros((BATCH_SIZE, 224, 224, 3))
 
-        # rgb_embeddings = np.zeros((BATCH_SIZE, 2048))
+        rgb_embeddings = np.zeros((BATCH_SIZE, 2048))
+        rgb_images = np.zeros((BATCH_SIZE, 224, 224, 3))
 
         for counter, prediction in enumerate(all_model_predictions):
             if counter == BATCH_SIZE:
@@ -62,21 +64,33 @@ def visualize_embeddings(tfrecords_file):
             neg_embeddings[counter] = neg_emb
             neg_depth_images[counter] = prediction["negative_depth_images"]
 
+            rgb_emb = np.reshape(prediction["rgb_descriptor"].squeeze(), (1, 2048))
+            rgb_embeddings[counter] = rgb_emb
+            rgb_images[counter] = prediction["object_image"]
 
         tf.get_default_graph()._unsafe_unfinalize()
 
         all_embeddings = np.vstack((pos_embeddings, neg_embeddings))
+        all_embeddings = np.vstack((all_embeddings, rgb_embeddings))
+
         all_images = np.vstack((pos_depth_images, neg_depth_images))
+        all_images = np.vstack((all_images, rgb_images))
 
         create_sprite(pos_depth_images, "pos_depth_sprite.png")
         tf.logging.info("Positive Embeddings shape: {}".format(pos_embeddings.shape))
-        create_sprite(pos_depth_images, "neg_depth_sprite.png")
+
+        create_sprite(neg_depth_images, "neg_depth_sprite.png")
         tf.logging.info("Negative Embeddings shape: {}".format(neg_embeddings.shape))
+
+        create_sprite(rgb_images, "rgb_images_sprite.png")
+        tf.logging.info("RGB Embeddings shape: {}".format(rgb_embeddings.shape))
+
         create_sprite(all_images, "all_depth_sprite.png")
         tf.logging.info("All Embeddings shape: {}".format(all_embeddings.shape))
 
         pos_embedding_var = tf.Variable(pos_embeddings, name='pos_depth')
-        neg_embedding_var = tf.Variable(pos_embeddings, name='neg_depth')
+        neg_embedding_var = tf.Variable(neg_embeddings, name='neg_depth')
+        rgb_embedding_var = tf.Variable(rgb_embeddings, name='rgb_embedding')
         all_embedding_var = tf.Variable(all_embeddings, name='all_depth')
 
         eval_dir = os.path.join(MODEL_DIR, "eval")
@@ -93,6 +107,12 @@ def visualize_embeddings(tfrecords_file):
         neg_embedding.tensor_name = neg_embedding_var.name
         neg_embedding.sprite.image_path = "neg_depth_sprite.png"
         neg_embedding.sprite.single_image_dim.extend([224, 224])
+
+
+        rgb_embedding = config.embeddings.add()
+        rgb_embedding.tensor_name = rgb_embedding_var.name
+        rgb_embedding.sprite.image_path = "rgb_images_sprite.png"
+        rgb_embedding.sprite.single_image_dim.extend([224, 224])
 
         all_embedding = config.embeddings.add()
         all_embedding.tensor_name = all_embedding_var.name
