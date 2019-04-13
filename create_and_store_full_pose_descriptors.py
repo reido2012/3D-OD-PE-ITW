@@ -26,12 +26,12 @@ def main(json_file_name, model_dir):
 
         for counter, prediction in enumerate(all_model_predictions):
             depth_emb = tuple(prediction["depth_embeddings"].squeeze())
-            cad_index = prediction["cad_index"]
-            object_class = prediction["object_class"]
-            image_path = prediction["image_path"]
-            rot_x = prediction["rot_x"]
-            rot_y = prediction["rot_y"]
-            rot_z = prediction["rot_z"]
+            cad_index = str(prediction["cad_index"])
+            object_class = str(prediction["object_class"])
+            image_path = str(prediction["image_path"])
+            rot_x = str(prediction["rot_x"])
+            rot_y = str(prediction["rot_y"])
+            rot_z = str(prediction["rot_z"])
 
             descriptor_info = {
                 "cad_index": cad_index,
