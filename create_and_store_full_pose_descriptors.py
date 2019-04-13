@@ -88,20 +88,18 @@ def tfrecord_parser(serialized_example):
 
     object_class = features['object_class']
     cad_index = features['cad_index']
-    image_path = features['rot_z']
+    image_path = features['image_path']
     rot_x = features['rot_x']
     rot_y = features['rot_y']
     rot_z = features['rot_z']
 
     depth_image = convert_string_to_image(features['depth_image'], standardize=False)
 
-    return depth_image, (object_class, image_path,  cad_index, rot_x, rot_y, rot_z)
+    return (depth_image, object_class, image_path,  cad_index, rot_x, rot_y, rot_z), object_class
 
 
 def synth_domain_cnn_model_fn_predict(features, labels, mode):
-    depth_images = features
-
-    object_class, image_path,  cad_index, rot_x, rot_y, rot_z = labels
+    depth_images, object_class, image_path,  cad_index, rot_x, rot_y, rot_z = features
 
     with tf.variable_scope('synth_domain'):
         with slim.arg_scope(resnet_v1.resnet_arg_scope()):
