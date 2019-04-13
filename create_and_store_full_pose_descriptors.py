@@ -8,7 +8,7 @@ NETWORK_NAME = 'resnet_v1_50'
 MODEL_DIR = ""
 slim = tf.contrib.slim
 
-FULL_POSE_TFRECORD = "/home/omarreid/datasets/full_pose_space.tfrecords"
+FULL_POSE_TFRECORD = "/home/omarreid/selerio/datasets/full_pose_space.tfrecords"
 
 def main(json_file_name, model_dir):
     global MODEL_DIR
