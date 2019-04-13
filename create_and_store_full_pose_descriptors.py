@@ -25,7 +25,7 @@ def main(json_file_name, model_dir):
         all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(FULL_POSE_TFRECORD), yield_single_examples=True)
 
         for counter, prediction in enumerate(all_model_predictions):
-            depth_emb = tuple(prediction["depth_embeddings"].squeeze())
+            depth_emb = tuple(prediction["depth_embeddings"].squeeze().astype(str))
             cad_index = prediction["cad_index"].decode("utf-8")
             object_class = prediction["object_class"].decode("utf-8")
             image_path = prediction["image_path"].decode("utf-8")
