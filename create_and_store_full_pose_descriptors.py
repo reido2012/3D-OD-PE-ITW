@@ -40,7 +40,7 @@ def main(json_file_name, model_dir):
             }
 
             viewpoint = (rot_x, rot_y, rot_z)
-
+            viewpoint = str(viewpoint)
             if viewpoint in full_pose_space_db:
                 full_pose_space_db[viewpoint][depth_emb] = descriptor_info
             else:
