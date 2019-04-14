@@ -14,7 +14,7 @@ TRIPLET_LOSS_MARGIN = 1
 REG_CONSTANT = 1e-3
 MODEL_DIR = ""
 PATH_TO_RD_META = ""
-STARTING_LR = 1e-6
+STARTING_LR = 1e-5
 TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords_all_negs/"
 TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR + "pascal_train.tfrecords",  TFRECORDS_DIR + "imagenet_val.tfrecords"]
 EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
@@ -54,7 +54,7 @@ def synth_domain_cnn_model_fn(features, labels, mode):
         learning_rate = tf.train.exponential_decay(
             learning_rate=STARTING_LR,
             global_step=global_step,
-            decay_steps=20006,
+            decay_steps=28000,
             decay_rate=0.1,
             staircase=True,
             name="learning_rate"
@@ -115,8 +115,8 @@ def tfrecord_parser(serialized_example):
     rgb_descriptor = tf.cast(features['rgb_descriptor'], tf.float32)
 
     key = np.random.choice(potential_keys[:3])
-    negative_depth_image = convert_string_to_image(features[key], standardize=False)
-    pos_depth_image = convert_string_to_image(features['positive_depth_image'], standardize=False)
+    negative_depth_image = convert_string_to_image(features[key], standardize=True)
+    pos_depth_image = convert_string_to_image(features['positive_depth_image'], standardize=True)
 
     return (rgb_descriptor, pos_depth_image, negative_depth_image), object_class
 
@@ -189,7 +189,7 @@ def eval_input_fn():
 
 
 @click.command()
-@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/synth_models/model_three",
+@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/synth_models/model_four",
               help='Path to model to evaluate')
 def main(model_dir):
     # Create your own input function - https://www.tensorflow.org/guide/custom_estimators
