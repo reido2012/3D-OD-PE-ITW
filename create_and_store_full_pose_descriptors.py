@@ -3,51 +3,84 @@ import json
 import numpy as np
 import glob
 import pathlib
+import sqlite3
 from nets import nets_factory, resnet_v1
+
 NETWORK_NAME = 'resnet_v1_50'
 MODEL_DIR = ""
 slim = tf.contrib.slim
 
 FULL_POSE_TFRECORD = "/home/omarreid/selerio/datasets/full_pose_space.tfrecords"
 
-def main(json_file_name, model_dir):
-    global MODEL_DIR
-    MODEL_DIR = model_dir
 
+def main(json_file_name, model_dir):
     full_pose_space_db = dict({})
 
     with tf.device("/device:GPU:0"):
-        synth_domain_cnn = tf.estimator.Estimator(
-            model_fn=synth_domain_cnn_model_fn_predict,
-            model_dir=model_dir
-        )
 
-        all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(FULL_POSE_TFRECORD), yield_single_examples=True)
+        store_to_db(model_dir)
 
-        for counter, prediction in enumerate(all_model_predictions):
-            depth_emb = tuple(prediction["depth_embeddings"].squeeze().astype(str))
-            cad_index = prediction["cad_index"].decode("utf-8")
-            object_class = prediction["object_class"].decode("utf-8")
-            image_path = prediction["image_path"].decode("utf-8")
-            rot_x = prediction["rot_x"].decode("utf-8")
-            rot_y = prediction["rot_y"].decode("utf-8")
-            rot_z = prediction["rot_z"].decode("utf-8")
+    #     synth_domain_cnn = tf.estimator.Estimator(
+    #         model_fn=synth_domain_cnn_model_fn_predict,
+    #         model_dir=model_dir
+    #     )
+    #
+    #     all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(FULL_POSE_TFRECORD),
+    #                                                      yield_single_examples=True)
+    #
+    #     for counter, prediction in enumerate(all_model_predictions):
+    #         depth_emb = tuple(prediction["depth_embeddings"].squeeze().astype(str))
+    #         cad_index = prediction["cad_index"].decode("utf-8")
+    #         object_class = prediction["object_class"].decode("utf-8")
+    #         image_path = prediction["image_path"].decode("utf-8")
+    #         rot_x = prediction["rot_x"].decode("utf-8")
+    #         rot_y = prediction["rot_y"].decode("utf-8")
+    #         rot_z = prediction["rot_z"].decode("utf-8")
+    #
+    #         descriptor_info = {
+    #             "cad_index": cad_index,
+    #             "object_class": object_class,
+    #             "depth_image_path": image_path
+    #         }
+    #
+    #         viewpoint = (rot_x, rot_y, rot_z)
+    #         viewpoint = str(viewpoint)
+    #         if viewpoint in full_pose_space_db:
+    #             full_pose_space_db[viewpoint][depth_emb] = descriptor_info
+    #         else:
+    #             full_pose_space_db[viewpoint] = {depth_emb: descriptor_info}
+    #
+    # with open(json_file_name + '.json', 'w') as fp:
+    #     json.dump(full_pose_space_db, fp, indent=4)
 
-            descriptor_info = {
-                "cad_index": cad_index,
-                "object_class": object_class,
-                "depth_image_path": image_path
-            }
 
-            viewpoint = (rot_x, rot_y, rot_z)
-            viewpoint = str(viewpoint)
-            if viewpoint in full_pose_space_db:
-                full_pose_space_db[viewpoint][depth_emb] = descriptor_info
-            else:
-                full_pose_space_db[viewpoint] = {depth_emb: descriptor_info}
+def store_to_db(model_dir):
+    conn = sqlite3.connect('full_pose.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE full_pose_space
+                 (rot_x text, rot_y text, rot_z text, image_path text, object_class text, cad_index text, depth_embedding text)''')
 
-    with open(json_file_name + '.json', 'w') as fp:
-        json.dump(full_pose_space_db, fp, indent=4)
+    synth_domain_cnn = tf.estimator.Estimator(
+        model_fn=synth_domain_cnn_model_fn_predict,
+        model_dir=model_dir
+    )
+
+    all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(FULL_POSE_TFRECORD),
+                                                     yield_single_examples=True)
+
+    for counter, prediction in enumerate(all_model_predictions):
+        depth_emb = json.dumps(prediction["depth_embeddings"].squeeze().astype(str))
+        cad_index = prediction["cad_index"].decode("utf-8")
+        object_class = prediction["object_class"].decode("utf-8")
+        image_path = prediction["image_path"].decode("utf-8")
+        rot_x = prediction["rot_x"].decode("utf-8")
+        rot_y = prediction["rot_y"].decode("utf-8")
+        rot_z = prediction["rot_z"].decode("utf-8")
+
+        c.execute("INSERT INTO full_pose_space VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                  (rot_x, rot_y, rot_z, image_path, object_class, cad_index, depth_emb))
+
+    c.close()
 
 
 def predict_input_fn(tfrecords_file):
@@ -95,11 +128,11 @@ def tfrecord_parser(serialized_example):
 
     depth_image = convert_string_to_image(features['depth_image'], standardize=False)
 
-    return (depth_image, object_class, image_path,  cad_index, rot_x, rot_y, rot_z), object_class
+    return (depth_image, object_class, image_path, cad_index, rot_x, rot_y, rot_z), object_class
 
 
 def synth_domain_cnn_model_fn_predict(features, labels, mode):
-    depth_images, object_class, image_path,  cad_index, rot_x, rot_y, rot_z = features
+    depth_images, object_class, image_path, cad_index, rot_x, rot_y, rot_z = features
 
     with tf.variable_scope('synth_domain'):
         with slim.arg_scope(resnet_v1.resnet_arg_scope()):
