@@ -64,7 +64,7 @@ def visualize_embeddings(tfrecords_file):
             neg_embeddings[counter] = neg_emb
             neg_depth_images[counter] = prediction["negative_depth_images"]
 
-            rgb_emb = np.reshape(prediction["rgb_descriptor"].squeeze(), (1, 2048))
+            rgb_emb = np.reshape(prediction["rgb_embeddings"].squeeze(), (1, 2048))
             rgb_embeddings[counter] = rgb_emb
             rgb_images[counter] = prediction["object_image"]
 
@@ -107,7 +107,6 @@ def visualize_embeddings(tfrecords_file):
         neg_embedding.tensor_name = neg_embedding_var.name
         neg_embedding.sprite.image_path = "neg_depth_sprite.png"
         neg_embedding.sprite.single_image_dim.extend([224, 224])
-
 
         rgb_embedding = config.embeddings.add()
         rgb_embedding.tensor_name = rgb_embedding_var.name
