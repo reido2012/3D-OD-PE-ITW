@@ -66,7 +66,7 @@ def visualize_embeddings(tfrecords_file):
 
             rgb_emb = np.reshape(prediction["rgb_embeddings"].squeeze(), (1, 2048))
             rgb_embeddings[counter] = rgb_emb
-            rgb_images[counter] = prediction["object_image"]
+            rgb_images[counter] = prediction["object_images"]
 
         tf.get_default_graph()._unsafe_unfinalize()
 
