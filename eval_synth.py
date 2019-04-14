@@ -112,7 +112,7 @@ def visualize_embeddings(tfrecords_file):
 
         all_embedding = config.embeddings.add()
         all_embedding.tensor_name = all_embedding_var.name
-        all_embedding.sprite.image_path = "all_depth_sprite.png"
+        all_embedding.sprite.image_path = "all_sprite.png"
         all_embedding.sprite.single_image_dim.extend([224, 224])
 
         # Say that you want to visualise the embeddings
