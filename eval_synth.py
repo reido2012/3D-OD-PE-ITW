@@ -70,11 +70,8 @@ def visualize_embeddings(tfrecords_file):
 
         tf.get_default_graph()._unsafe_unfinalize()
 
-        all_embeddings = np.vstack((pos_embeddings, neg_embeddings))
-        all_embeddings = np.vstack((all_embeddings, rgb_embeddings))
-
-        all_images = np.vstack((pos_depth_images, neg_depth_images))
-        all_images = np.vstack((all_images, rgb_images))
+        all_embeddings = np.vstack((pos_embeddings, neg_embeddings, rgb_embeddings))
+        all_images = np.vstack((pos_depth_images, neg_depth_images, rgb_images))
 
         create_sprite(pos_depth_images, "pos_depth_sprite.png")
         tf.logging.info("Positive Embeddings shape: {}".format(pos_embeddings.shape))
