@@ -116,7 +116,7 @@ def tfrecord_parser(serialized_example):
             )
 
             break
-        except errors.InvalidArgumentError:
+        except ValueError:
             counter += 1
 
     object_class = features['object_class']
