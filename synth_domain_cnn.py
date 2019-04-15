@@ -195,7 +195,7 @@ def eval_input_fn():
 
 
 @click.command()
-@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/synth_models/model_four",
+@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/synth_models/model_five",
               help='Path to model to evaluate')
 def main(model_dir):
     # Create your own input function - https://www.tensorflow.org/guide/custom_estimators
