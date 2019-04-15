@@ -1,6 +1,7 @@
 import tensorflow as tf
 import click
 import glob
+from potential_features import FEATURES_LIST, KEYS
 import numpy as np
 from nets import nets_factory, resnet_v1
 
@@ -14,14 +15,15 @@ TRIPLET_LOSS_MARGIN = 1
 REG_CONSTANT = 1e-3
 MODEL_DIR = ""
 PATH_TO_RD_META = ""
-STARTING_LR = 1e-5
+STARTING_LR = 1e-4
 TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords_all_negs/"
-TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR + "pascal_train.tfrecords",  TFRECORDS_DIR + "imagenet_val.tfrecords"]
+TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR + "pascal_train.tfrecords",
+                      TFRECORDS_DIR + "imagenet_val.tfrecords"]
 EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
 NETWORK_NAME = 'resnet_v1_50'
 PRETRAINED_MODEL_DIR = "/home/omarreid/selerio/final_year_project/models/test_one"
 RESNET_V1_CHECKPOINT_DIR = "/home/omarreid/selerio/datasets/pre_trained_weights/resnet_v1_50.ckpt"
-potential_keys = ["neg/depth/img/0", "neg/depth/img/1", "neg/depth/img/2", "neg/depth/img/3", "neg/depth/img/4", "neg/depth/img/5"]
+
 
 
 def synth_domain_cnn_model_fn(features, labels, mode):
@@ -40,11 +42,15 @@ def synth_domain_cnn_model_fn(features, labels, mode):
     if tf.gfile.IsDirectory(MODEL_DIR):
         checkpoint_path = tf.train.latest_checkpoint(MODEL_DIR)
         variables_to_restore = [v for v in variables_to_restore if 'resnet_v1_50/' in v.name]
-        tf.train.init_from_checkpoint(checkpoint_path, {v.name.split(':')[0]: v.name.split(':')[0] for v in variables_to_restore})
+        tf.train.init_from_checkpoint(checkpoint_path,
+                                      {v.name.split(':')[0]: v.name.split(':')[0] for v in variables_to_restore})
     else:
         checkpoint_path = RESNET_V1_CHECKPOINT_DIR
-        variables_to_restore = [v for v in variables_to_restore if 'resnet_v1_50/' in v.name and 'real_domain/' not in v.name and 'synth_domain/' in v.name]
-        tf.train.init_from_checkpoint(checkpoint_path, {v.name.split(':')[0].replace('synth_domain/', '', 1): v.name.split(':')[0] for v in variables_to_restore})
+        variables_to_restore = [v for v in variables_to_restore if
+                                'resnet_v1_50/' in v.name and 'real_domain/' not in v.name and 'synth_domain/' in v.name]
+        tf.train.init_from_checkpoint(checkpoint_path,
+                                      {v.name.split(':')[0].replace('synth_domain/', '', 1): v.name.split(':')[0] for v
+                                       in variables_to_restore})
 
     loss = similarity_loss(rgb_descriptors, positive_depth_descriptors, negative_depth_descriptors)
 
@@ -87,7 +93,7 @@ def similarity_loss(rgb_descriptor, pos_descriptor, neg_descriptor):
 
 
 def descriptor_loss(s_pos, s_neg):
-    loss = tf.maximum(0.0,  s_pos - s_neg + TRIPLET_LOSS_MARGIN)
+    loss = tf.maximum(0.0, s_pos - s_neg + TRIPLET_LOSS_MARGIN)
     loss = tf.reduce_mean(loss)
     return loss
 
@@ -96,25 +102,25 @@ def tfrecord_parser(serialized_example):
     """
         Parses a single tf.Example into image and label tensors.
     """
+    counter = 0
+    while True:
 
-    features = tf.parse_single_example(
-        serialized_example,
-        # Defaults are not specified since both keys are required.
-        features={
-            'positive_depth_image': tf.FixedLenFeature([], tf.string),
-            'neg/depth/img/0': tf.FixedLenFeature([], tf.string),
-            'neg/depth/img/1': tf.FixedLenFeature([], tf.string),
-            'neg/depth/img/2': tf.FixedLenFeature([], tf.string),
-            'rgb_descriptor': tf.FixedLenFeature([2048], tf.float32),
-            'num_negative_depth_images': tf.FixedLenFeature([], tf.int64),
-            'object_class': tf.FixedLenFeature([], tf.string)
-        }
-    )
+        try:
+            features = tf.parse_single_example(
+                serialized_example,
+                # Defaults are not specified since both keys are required.
+                features=FEATURES_LIST[counter]
+            )
+
+            break
+        except ValueError as e:
+            counter += 1
+            pass
 
     object_class = features['object_class']
     rgb_descriptor = tf.cast(features['rgb_descriptor'], tf.float32)
 
-    key = np.random.choice(potential_keys[:3])
+    key = np.random.choice(KEYS[counter:])
     negative_depth_image = convert_string_to_image(features[key], standardize=True)
     pos_depth_image = convert_string_to_image(features['positive_depth_image'], standardize=True)
 
@@ -160,7 +166,7 @@ def dataset_base(dataset, shuffle=True):
     dataset = dataset.map(map_func=tfrecord_parser, num_parallel_calls=NUM_CPU_CORES)  # Parallelize data transformation
     dataset.apply(tf.contrib.data.ignore_errors())
     dataset = dataset.batch(batch_size=BATCH_SIZE)
-    return dataset.prefetch(buffer_size=2)
+    return dataset.prefetch(buffer_size=6)
 
 
 def train_input_fn():
