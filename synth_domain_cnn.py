@@ -118,6 +118,8 @@ def tfrecord_parser(serialized_example):
             break
         except ValueError:
             counter += 1
+        except errors.InvalidArgumentError:
+            counter += 1
 
     object_class = features['object_class']
     rgb_descriptor = tf.cast(features['rgb_descriptor'], tf.float32)
