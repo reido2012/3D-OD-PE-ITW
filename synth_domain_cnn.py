@@ -104,7 +104,7 @@ def tfrecord_parser(serialized_example):
     """
     counter = 0
     while True:
-
+        print(counter)
         try:
             features = tf.parse_single_example(
                 serialized_example,
@@ -113,9 +113,8 @@ def tfrecord_parser(serialized_example):
             )
 
             break
-        except ValueError as e:
+        except tf.errors.InvalidArgumentError:
             counter += 1
-            pass
 
     object_class = features['object_class']
     rgb_descriptor = tf.cast(features['rgb_descriptor'], tf.float32)
