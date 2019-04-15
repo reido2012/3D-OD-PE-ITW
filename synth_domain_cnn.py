@@ -2,6 +2,7 @@ import tensorflow as tf
 import click
 import glob
 from potential_features import FEATURES_LIST, KEYS
+from tensorflow.python.framework import errors
 import numpy as np
 from nets import nets_factory, resnet_v1
 
@@ -115,7 +116,7 @@ def tfrecord_parser(serialized_example):
             )
 
             break
-        except Exception:
+        except errors.InvalidArgumentError:
             counter += 1
 
     object_class = features['object_class']
