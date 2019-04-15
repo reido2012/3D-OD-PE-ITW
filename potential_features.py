@@ -10,7 +10,6 @@ FEATURES_3 = {
     'object_class': tf.FixedLenFeature([], tf.string)
 }
 
-
 FEATURES_4 = {
     'positive_depth_image': tf.FixedLenFeature([], tf.string),
     'neg/depth/img/0': tf.FixedLenFeature([], tf.string),
@@ -109,6 +108,7 @@ FEATURES_10 = {
     'object_class': tf.FixedLenFeature([], tf.string)
 }
 
-KEYS = ["neg/depth/img/9", "neg/depth/img/8", "neg/depth/img/7", "neg/depth/img/6", "neg/depth/img/5", "neg/depth/img/4", "neg/depth/img/3", "neg/depth/img/2", "neg/depth/img/1", "neg/depth/img/0"]
+KEYS = ["neg/depth/img/9", "neg/depth/img/8", "neg/depth/img/7", "neg/depth/img/6", "neg/depth/img/5",
+        "neg/depth/img/4", "neg/depth/img/3", "neg/depth/img/2", "neg/depth/img/1", "neg/depth/img/0"]
 
-FEATURES_LIST = [FEATURES_10, FEATURES_9,  FEATURES_8,  FEATURES_7, FEATURES_6, FEATURES_5, FEATURES_4, FEATURES_3]
+FEATURES_LIST = [FEATURES_10, FEATURES_9, FEATURES_8, FEATURES_7, FEATURES_6, FEATURES_5, FEATURES_4, FEATURES_3]

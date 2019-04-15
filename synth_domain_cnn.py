@@ -102,8 +102,10 @@ def tfrecord_parser(serialized_example):
     """
         Parses a single tf.Example into image and label tensors.
     """
+    print("In TFRecord Parser")
     counter = 0
     while True:
+        print("Counter:")
         print(counter)
         try:
             features = tf.parse_single_example(
@@ -113,7 +115,7 @@ def tfrecord_parser(serialized_example):
             )
 
             break
-        except tf.errors.InvalidArgumentError:
+        except Exception:
             counter += 1
 
     object_class = features['object_class']
