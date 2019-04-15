@@ -104,35 +104,28 @@ def tfrecord_parser(serialized_example):
         Parses a single tf.Example into image and label tensors.
     """
     print("In TFRecord Parser")
+    # counter = 0
+    # while True:
+    #     print("Counter:")
+    #     print(counter)
+    #     try:
+    #
+    #         break
+    #     except ValueError:
+    #         counter += 1
+    #     except errors.InvalidArgumentError:
+    #         counter += 1
 
-
-    example = tf.train.Example()
-    example.ParseFromString(serialized_example)
-    f = example.features.feature
-    all_keys = f.keys()
-    print(all_keys)
-
-    counter = 0
-    while True:
-        print("Counter:")
-        print(counter)
-        try:
-            features = tf.parse_single_example(
-                serialized_example,
-                # Defaults are not specified since both keys are required.
-                features=FEATURES_LIST[counter]
-            )
-
-            break
-        except ValueError:
-            counter += 1
-        except errors.InvalidArgumentError:
-            counter += 1
+    features = tf.parse_single_example(
+        serialized_example,
+        # Defaults are not specified since both keys are required.
+        features=FEATURES_LIST[7]
+    )
 
     object_class = features['object_class']
     rgb_descriptor = tf.cast(features['rgb_descriptor'], tf.float32)
 
-    key = np.random.choice(KEYS[counter:])
+    key = np.random.choice(KEYS[7:])
     negative_depth_image = convert_string_to_image(features[key], standardize=True)
     pos_depth_image = convert_string_to_image(features['positive_depth_image'], standardize=True)
 
@@ -207,7 +200,7 @@ def eval_input_fn():
 
 
 @click.command()
-@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/synth_models/model_five",
+@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/synth_models/model_four",
               help='Path to model to evaluate')
 def main(model_dir):
     # Create your own input function - https://www.tensorflow.org/guide/custom_estimators
