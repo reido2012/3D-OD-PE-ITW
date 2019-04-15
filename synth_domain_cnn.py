@@ -104,6 +104,14 @@ def tfrecord_parser(serialized_example):
         Parses a single tf.Example into image and label tensors.
     """
     print("In TFRecord Parser")
+
+
+    example = tf.train.Example()
+    example.ParseFromString(serialized_example)
+    f = example.features.feature
+    all_keys = f.keys()
+    print(all_keys)
+
     counter = 0
     while True:
         print("Counter:")
