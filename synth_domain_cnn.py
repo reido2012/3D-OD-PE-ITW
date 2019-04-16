@@ -216,7 +216,6 @@ def _render_py_function(features, label):
 
 def _resize_function(features, label):
     rgb_descriptor, pos_depth_image, negative_depth_image = features
-    negative_depth_image.set_shape([224, 224, 3])
     negative_depth_image = tf.image.resize_images(negative_depth_image, [224, 224, 3])
     return (rgb_descriptor, pos_depth_image, negative_depth_image), label
 
