@@ -262,6 +262,9 @@ def main(model_dir):
 
     global MODEL_DIR
     MODEL_DIR = model_dir
+
+
+
     with tf.device("/device:GPU:0"):
         # Create the Estimator
         synth_domain_cnn = tf.estimator.Estimator(
@@ -313,7 +316,7 @@ def magic_input_fn(eval=False):
         print(f"Pos Obj: {pos_obj}")
 
         random_model_obj_path = np.random.choice(all_model_paths)
-        while pos_obj != random_model_obj_path:
+        while pos_obj == random_model_obj_path:
             random_model_obj_path = np.random.choice(all_model_paths)
 
         random_cad_index = random_model_obj_path.split("/")[-1][:-4]
