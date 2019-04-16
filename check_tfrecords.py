@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import pascal3d
 from PIL import Image
 import glob
+import cv2
+import subprocess
 import os.path as osp
 import numpy as np
 import skimage.io as io
@@ -55,9 +57,34 @@ def main():
         print(f"Random Obj Model: {random_model_obj_path}")
         print(f"Random Cad Index: {random_cad_index}")
 
+        depth_path = "/home/omarreid/selerio/datasets/random_render/0" + "/" + data_id + "_" + str(
+            random_cad_index) + "_0001.png"
+
+        command = "blender -noaudio --background --python ./blender_render.py -- --specific_viewpoint=True " \
+                  "--cad_index=" + random_cad_index + " --obj_id=" + data_id + " --radians=True " \
+                                                                               "--viewpoint=" + str(
+            0) + "," + str(
+            90) + "," + str(
+            0) + " --bbox=" + str(
+            1) + "," + str(
+            1) + "," + str(
+            1) + " --output_folder /home/omarreid/selerio/datasets/random_render/0" + " "
+
+        full_command = command + random_model_obj_path
+
+        try:
+            subprocess.run(full_command.split(), check=True)
+        except subprocess.CalledProcessError as e:
+            print(e)
+            raise e
+
+        print("Command: " + full_command)
+        negative_depth_image = cv2.imread(depth_path, cv2.IMREAD_COLOR)
+        negative_depth_image = cv2.cvtColor(negative_depth_image, cv2.COLOR_BGR2RGB)
+
         fig = plt.figure()
         ax = plt.subplot(1, 1, 1)
-        ax.imshow(pos_depth_image)
+        ax.imshow(negative_depth_image)
 
         plt.savefig("checkkkkkkk.png")
 
