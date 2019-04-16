@@ -269,11 +269,12 @@ def main(model_dir):
             model_fn=synth_domain_cnn_model_fn,
             model_dir=model_dir
         )
-
+        print("Post Model Definition")
         tensors_to_log = {"loss": "loss", "learning_rate": "learning_rate", }
         logging_hook = tf.train.LoggingTensorHook(tensors=tensors_to_log, every_n_iter=100)
 
         train_spec = tf.estimator.TrainSpec(input_fn=lambda x: magic_input_fn(True), hooks=[logging_hook])
+        print("Post Train Spec")
         eval_spec = tf.estimator.EvalSpec(input_fn=lambda x: magic_input_fn(True), hooks=[logging_hook])
 
         tf.estimator.train_and_evaluate(synth_domain_cnn, train_spec, eval_spec)
@@ -287,6 +288,9 @@ def magic_input_fn(eval=False):
 
     if eval:
         iterator = EVAL_ITERATOR
+
+    print("Inside Magic Input FN")
+    print(len(list(iterator)))
 
     for string_record in iterator:
         example = tf.train.Example()
@@ -309,7 +313,7 @@ def magic_input_fn(eval=False):
 
         all_model_paths = list(glob.glob(OBJ_DIR + "*/*.obj"))  # All classes, all objs
 
-        pos_obj = OBJ_DIR + str(object_class) + str(cad_index)
+        pos_obj = OBJ_DIR + str(object_class) + "/" + str(cad_index) + ".obj"
 
         print(f"Pos Obj: {pos_obj}")
 
