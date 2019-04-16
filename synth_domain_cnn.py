@@ -136,7 +136,7 @@ def tfrecord_parser(serialized_example):
     negative_depth_image = convert_string_to_image(features[key], standardize=True)
     pos_depth_image = convert_string_to_image(features['positive_depth_image'], standardize=True)
 
-    return np.array([rgb_descriptor, pos_depth_image, negative_depth_image, cad_index, data_id]), object_class
+    return (rgb_descriptor, pos_depth_image, negative_depth_image, cad_index, data_id), object_class
 
 
 def convert_string_to_image(image_string, standardize=True):
@@ -225,7 +225,7 @@ def dataset_base(dataset, shuffle=True):
         dataset = dataset.shuffle(buffer_size=5000)
 
     dataset = dataset.map(map_func=tfrecord_parser, num_parallel_calls=NUM_CPU_CORES)  # Parallelize data transformation
-    dataset = dataset.map(lambda features, label: tuple(tf.py_func(_render_py_function, [features, label], [tf.float32, tf.float32, tf.float32, tf.string, tf.string, tf.string])))
+    dataset = dataset.map(lambda features, label: tuple(tf.py_func(_render_py_function, [np.array([features]), label], [tf.float32, tf.float32, tf.float32, tf.string, tf.string, tf.string])))
     dataset = dataset.map(_resize_function)
     dataset.apply(tf.contrib.data.ignore_errors())
     dataset = dataset.batch(batch_size=BATCH_SIZE)
