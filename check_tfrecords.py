@@ -23,7 +23,7 @@ def main():
         example.ParseFromString(string_record)
         features = example.features.feature
 
-        rgb_descriptor = features['rgb_descriptor'].floats_list.value
+        rgb_descriptor = features['rgb_descriptor'].float_list.value
         object_class = features['object_class'].bytes_list.value[0].decode("utf-8")
         data_id = features['data_id'].bytes_list.value[0].decode("utf-8")
         cad_index = features['cad_index'].bytes_list.value[0].decode("utf-8")
