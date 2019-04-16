@@ -263,8 +263,6 @@ def main(model_dir):
     global MODEL_DIR
     MODEL_DIR = model_dir
 
-
-
     with tf.device("/device:GPU:0"):
         # Create the Estimator
         synth_domain_cnn = tf.estimator.Estimator(
@@ -275,7 +273,7 @@ def main(model_dir):
         tensors_to_log = {"loss": "loss", "learning_rate": "learning_rate", }
         logging_hook = tf.train.LoggingTensorHook(tensors=tensors_to_log, every_n_iter=100)
 
-        train_spec = tf.estimator.TrainSpec(input_fn=magic_input_fn, hooks=[logging_hook])
+        train_spec = tf.estimator.TrainSpec(input_fn=lambda x: magic_input_fn(True), hooks=[logging_hook])
         eval_spec = tf.estimator.EvalSpec(input_fn=lambda x: magic_input_fn(True), hooks=[logging_hook])
 
         tf.estimator.train_and_evaluate(synth_domain_cnn, train_spec, eval_spec)
