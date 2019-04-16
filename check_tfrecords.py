@@ -43,17 +43,18 @@ def main():
         all_model_paths = list(glob.glob(OBJ_DIR + "*/*.obj"))  # All classes, all objs
 
         random_model_obj_path = np.random.choice(all_model_paths)
-        pos_obj = OBJ_DIR + str(object_class) + str(cad_index)
+        pos_obj = OBJ_DIR + str(object_class) + "/" + str(cad_index) + ".obj"
 
         print(f"Pos Obj: {pos_obj}")
 
-        while pos_obj != random_model_obj_path:
+        while pos_obj == random_model_obj_path:
             random_model_obj_path = np.random.choice(all_model_paths)
 
         random_cad_index = random_model_obj_path.split("/")[-1][:-4]
 
         print(f"Random Obj Model: {random_model_obj_path}")
         print(f"Random Cad Index: {random_cad_index}")
+
         fig = plt.figure()
         ax = plt.subplot(1, 1, 1)
         ax.imshow(pos_depth_image)
