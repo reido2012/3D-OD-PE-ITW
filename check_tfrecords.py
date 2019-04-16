@@ -4,6 +4,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import pascal3d
 from PIL import Image
+import glob
+import os.path as osp
 import numpy as np
 import skimage.io as io
 import tensorflow as tf
@@ -12,7 +14,8 @@ TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords_all_negs
 RECORD_TO_CHECK = TFRECORDS_DIR + "pascal_val.tfrecords"
 # OVERFIT_TEST_TFRECORDS = "/notebooks/selerio/overfit_check.tfrecords"
 # EVAL_TEST_TFRECORDS = "/home/omarreid/selerio/datasets/real_domain_tfrecords/imagenet_val.tfrecords"
-
+DATASET_DIR = osp.expanduser('/home/omarreid/selerio/datasets/PASCAL3D+_release1.1')
+OBJ_DIR = DATASET_DIR + "/OBJ/"
 
 def main():
     reconstructed_records = []
@@ -37,6 +40,20 @@ def main():
         print(f"Data ID: {data_id}")
         print(f"CAD Index: {cad_index}")
 
+        all_model_paths = list(glob.glob(OBJ_DIR + "*/*.obj"))  # All classes, all objs
+
+        random_model_obj_path = np.random.choice(all_model_paths)
+        pos_obj = OBJ_DIR + str(object_class) + str(cad_index)
+
+        print(f"Pos Obj: {pos_obj}")
+
+        while pos_obj != random_model_obj_path:
+            random_model_obj_path = np.random.choice(all_model_paths)
+
+        random_cad_index = random_model_obj_path.split("/")[-1][:-4]
+
+        print(f"Random Obj Model: {random_model_obj_path}")
+        print(f"Random Cad Index: {random_cad_index}")
         fig = plt.figure()
         ax = plt.subplot(1, 1, 1)
         ax.imshow(pos_depth_image)
