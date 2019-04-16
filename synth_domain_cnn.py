@@ -136,7 +136,7 @@ def tfrecord_parser(serialized_example):
     negative_depth_image = convert_string_to_image(features[key], standardize=True)
     pos_depth_image = convert_string_to_image(features['positive_depth_image'], standardize=True)
 
-    return (rgb_descriptor, pos_depth_image, negative_depth_image, cad_index, data_id), object_class
+    return (np.array([rgb_descriptor]), pos_depth_image, negative_depth_image, cad_index, data_id), object_class
 
 
 def convert_string_to_image(image_string, standardize=True):
