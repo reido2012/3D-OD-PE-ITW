@@ -23,10 +23,10 @@ def main():
         example.ParseFromString(string_record)
         features = example.features.feature
 
-        rgb_descriptor = float(features['rgb_descriptor'].bytes_list.value)
-        object_class = features['object_class'].bytes_list.value
-        data_id = features['data_id'].bytes_list.value
-        cad_index = features['cad_index'].bytes_list.value
+        rgb_descriptor = features['rgb_descriptor'].bytes_list.value[0]
+        object_class = features['object_class'].bytes_list.value[0]
+        data_id = features['data_id'].bytes_list.value[0]
+        cad_index = features['cad_index'].bytes_list.value[0]
 
         img_string = example.features.feature['positive_depth_image'].bytes_list.value[0]
         img_1d = np.fromstring(img_string, dtype=np.uint8)
