@@ -136,7 +136,7 @@ def tfrecord_parser(serialized_example):
     negative_depth_image = convert_string_to_image(features[key], standardize=True)
     pos_depth_image = convert_string_to_image(features['positive_depth_image'], standardize=True)
 
-    return (np.array([rgb_descriptor]), pos_depth_image, negative_depth_image, cad_index, data_id), object_class
+    return (rgb_descriptor, pos_depth_image, negative_depth_image, cad_index, data_id), object_class
 
 
 def convert_string_to_image(image_string, standardize=True):
@@ -158,7 +158,7 @@ def convert_string_to_image(image_string, standardize=True):
     image_shape = tf.cond(shape_pred, lambda: tf.stack([IMAGE_SIZE, IMAGE_SIZE, 1]),
                           lambda: tf.stack([IMAGE_SIZE, IMAGE_SIZE, 3]))
 
-    print("Within Convert String")
+
     input_image = tf.reshape(image, image_shape)
 
     channel_pred = tf.cast(tf.equal(tf.shape(input_image)[2], greyscale_channel), tf.bool)
