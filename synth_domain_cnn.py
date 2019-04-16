@@ -126,9 +126,9 @@ def tfrecord_parser(serialized_example):
         features=FEATURES_LIST[7]
     )
 
-    object_class = features['object_class']
-    data_id = features['data_id']
-    cad_index = features['cad_index']
+    object_class = features['object_class'].decode('utf-8')
+    data_id = features['data_id'].decode('utf-8')
+    cad_index = features['cad_index'].decode('utf-8')
 
     rgb_descriptor = tf.cast(features['rgb_descriptor'], tf.float32)
 
