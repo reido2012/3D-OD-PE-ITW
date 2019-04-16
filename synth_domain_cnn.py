@@ -126,7 +126,7 @@ def tfrecord_parser(serialized_example):
         features=FEATURES_LIST[7]
     )
 
-    object_class = features['object_class'].decode('utf-8')
+    object_class = tf.cast(features['object_class'], tf.string)
     data_id = tf.cast(features['data_id'], tf.string)
     cad_index = tf.cast(features['cad_index'], tf.string)
 
