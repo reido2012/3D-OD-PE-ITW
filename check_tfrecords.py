@@ -7,8 +7,9 @@ from PIL import Image
 import numpy as np
 import skimage.io as io
 import tensorflow as tf
-TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords_new/"
-RECORD_TO_CHECK = TFRECORDS_DIR + "imagenet_train.tfrecords"
+TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords_all_negs/"
+# RECORD_TO_CHECK = TFRECORDS_DIR + "imagenet_train.tfrecords"
+RECORD_TO_CHECK = TFRECORDS_DIR + "pascal_val.tfrecords"
 # OVERFIT_TEST_TFRECORDS = "/notebooks/selerio/overfit_check.tfrecords"
 # EVAL_TEST_TFRECORDS = "/home/omarreid/selerio/datasets/real_domain_tfrecords/imagenet_val.tfrecords"
 
@@ -18,30 +19,29 @@ def main():
     record_iterator = tf.python_io.tf_record_iterator(path=RECORD_TO_CHECK)
 
     for string_record in record_iterator:
-
         example = tf.train.Example()
-        example.ParseFromString(string_record)    
+        example.ParseFromString(string_record)
+        features = example.features.feature
 
-        print("RGB Descriptor")
-        rgb_descriptor = example.features.feature['rgb_descriptor'].bytes_list.value
+        rgb_descriptor = float(features['rgb_descriptor'].bytes_list.value)
+        object_class = features['object_class'].bytes_list.value
+        data_id = features['data_id'].bytes_list.value
+        cad_index = features['cad_index'].bytes_list.value
 
-        print(rgb_descriptor)
-        print(rgb_descriptor.shape)
-        # img_string = (example.features.feature['object_image']
-        #                               .bytes_list
-        #                               .value[0])
+        img_string = example.features.feature['positive_depth_image'].bytes_list.value[0]
+        img_1d = np.fromstring(img_string, dtype=np.uint8)
+        pos_depth_image = img_1d.reshape((224, 224, 3))
 
-        # for i in range(len(image_list)):
-        # img_1d = np.fromstring(image_list[0], dtype=np.uint8)
-        # reconstructed_img = img_1d.reshape((224, 224, -1))
-        #
-        # #break
-        #
-        # fig = plt.figure()
-        # ax = plt.subplot(1, 1, 1)
-        # ax.imshow(reconstructed_img)
-        #
-        # plt.savefig("checkkkkkkk.png")
+        print(f"RGB Descriptor: {rgb_descriptor}")
+        print(f"Object Class: {object_class}")
+        print(f"Data ID: {data_id}")
+        print(f"CAD Index: {cad_index}")
+
+        fig = plt.figure()
+        ax = plt.subplot(1, 1, 1)
+        ax.imshow(pos_depth_image)
+
+        plt.savefig("checkkkkkkk.png")
 
         return
 
@@ -97,4 +97,6 @@ def line_boxes(axis, virtual_control_points_pred, current_color):
     axis.plot([virtual_control_points_pred[4,0],virtual_control_points_pred[6,0]],
              [virtual_control_points_pred[4,1],virtual_control_points_pred[6,1]], current_color)
 
-main()
+
+if __name__ == "__main__":
+    main()
