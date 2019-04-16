@@ -288,10 +288,6 @@ def magic_input_fn():
     all_labels = []
 
     iterator = ALL_ITERATORS
-
-    if eval:
-        iterator = EVAL_ITERATOR
-
     print("Inside Magic Input FN")
     print(len(list(iterator)))
 
