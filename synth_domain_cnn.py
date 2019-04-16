@@ -1,6 +1,9 @@
 import tensorflow as tf
 import click
 import glob
+import subprocess
+import cv2
+import os.path as osp
 from potential_features import FEATURES_LIST, KEYS
 from tensorflow.python.framework import errors
 import numpy as np
@@ -24,7 +27,8 @@ EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
 NETWORK_NAME = 'resnet_v1_50'
 PRETRAINED_MODEL_DIR = "/home/omarreid/selerio/final_year_project/models/test_one"
 RESNET_V1_CHECKPOINT_DIR = "/home/omarreid/selerio/datasets/pre_trained_weights/resnet_v1_50.ckpt"
-
+DATASET_DIR = osp.expanduser('/home/omarreid/selerio/datasets/PASCAL3D+_release1.1')
+OBJ_DIR = DATASET_DIR + "/OBJ/"
 
 
 def synth_domain_cnn_model_fn(features, labels, mode):
@@ -123,13 +127,16 @@ def tfrecord_parser(serialized_example):
     )
 
     object_class = features['object_class']
+    data_id = features['data_id']
+    cad_index = features['cad_index']
+
     rgb_descriptor = tf.cast(features['rgb_descriptor'], tf.float32)
 
     key = np.random.choice(KEYS[7:])
     negative_depth_image = convert_string_to_image(features[key], standardize=True)
     pos_depth_image = convert_string_to_image(features['positive_depth_image'], standardize=True)
 
-    return (rgb_descriptor, pos_depth_image, negative_depth_image), object_class
+    return (rgb_descriptor, pos_depth_image, negative_depth_image, cad_index, data_id), object_class
 
 
 def convert_string_to_image(image_string, standardize=True):
@@ -164,11 +171,63 @@ def convert_string_to_image(image_string, standardize=True):
     return input_image
 
 
+# Use a custom OpenCV function to read the image, instead of the standard
+# TensorFlow `tf.read_file()` operation.
+def _render_py_function(features, label):
+    rgb_descriptor, pos_depth_image, negative_depth_image, cad_index, data_id = features
+    # rot_x, rot_y, rot_z,, bbox_dims
+    # x_dim, y_dim, z_dim = bbox_dims
+    object_class = label
+
+    all_model_paths = list(glob.glob(OBJ_DIR + "*/*.obj"))  # All classes, all objs
+
+    random_model_obj_path = np.random.choice(all_model_paths)
+    while object_class in random_model_obj_path and cad_index in random_model_obj_path:
+        random_model_obj_path = np.random.choice(all_model_paths)
+
+    random_cad_index = random_model_obj_path.split("/")[-1][:-4]
+
+    depth_path = "/home/omarreid/selerio/datasets/random_render/0" + "/" + data_id + "_" + str(random_cad_index) + "_0001.png"
+
+    command = "blender -noaudio --background --python ./blender_render.py -- --specific_viewpoint=True " \
+              "--cad_index=" + random_cad_index + " --obj_id=" + data_id + " --radians=True " \
+                                                                           "--viewpoint=" + str(
+        0) + "," + str(
+        90) + "," + str(
+        0) + " --bbox=" + str(
+        1) + "," + str(
+        1) + "," + str(
+        1) + " --output_folder /home/omarreid/selerio/datasets/random_render/0" + " "
+
+    full_command = command + random_model_obj_path
+
+    try:
+        subprocess.run(full_command.split(), check=True)
+    except subprocess.CalledProcessError as e:
+        print(e)
+        raise e
+
+    print("Command: " + full_command)
+    negative_depth_image = cv2.imread(depth_path, cv2.IMREAD_COLOR)
+    negative_depth_image = cv2.cvtColor(negative_depth_image, cv2.COLOR_BGR2RGB)
+
+    return (rgb_descriptor, pos_depth_image, negative_depth_image), label
+
+
+def _resize_function(features, label):
+    rgb_descriptor, pos_depth_image, negative_depth_image = features
+    negative_depth_image.set_shape([224, 224, 3])
+    negative_depth_image = tf.image.resize_images(negative_depth_image, [224, 224, 3])
+    return (rgb_descriptor, pos_depth_image, negative_depth_image), label
+
+
 def dataset_base(dataset, shuffle=True):
     if shuffle:
         dataset = dataset.shuffle(buffer_size=5000)
 
     dataset = dataset.map(map_func=tfrecord_parser, num_parallel_calls=NUM_CPU_CORES)  # Parallelize data transformation
+    dataset = dataset.map(lambda features, label: tuple(tf.py_func(_render_py_function, [features, label])))
+    dataset = dataset.map(_resize_function)
     dataset.apply(tf.contrib.data.ignore_errors())
     dataset = dataset.batch(batch_size=BATCH_SIZE)
     return dataset.prefetch(buffer_size=6)
