@@ -7,6 +7,7 @@ import os.path as osp
 from potential_features import FEATURES_LIST, KEYS
 from tensorflow.python.framework import errors
 import numpy as np
+from itertools import chain
 from nets import nets_factory, resnet_v1
 
 slim = tf.contrib.slim
@@ -24,11 +25,11 @@ TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords_all_negs
 TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR + "pascal_train.tfrecords",
                       TFRECORDS_DIR + "imagenet_val.tfrecords"]
 
-record_iterator_train1 = list(tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "imagenet_train.tfrecords"))
-record_iterator_train2 = list(tf.python_io.tf_record_iterator(path= TFRECORDS_DIR + "pascal_train.tfrecords"))
-record_iterator_train3 = list(tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "imagenet_val.tfrecords"))
+record_iterator_train1 = tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "imagenet_train.tfrecords")
+record_iterator_train2 = tf.python_io.tf_record_iterator(path= TFRECORDS_DIR + "pascal_train.tfrecords")
+record_iterator_train3 = tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "imagenet_val.tfrecords")
 
-ALL_ITERATORS = record_iterator_train1 + record_iterator_train2 +record_iterator_train3
+ALL_ITERATORS = chain(record_iterator_train1, record_iterator_train2, record_iterator_train3)
 
 EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
 EVAL_ITERATOR = tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "pascal_val.tfrecords")
