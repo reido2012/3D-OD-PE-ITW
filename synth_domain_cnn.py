@@ -23,7 +23,15 @@ STARTING_LR = 1e-4
 TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords_all_negs/"
 TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR + "pascal_train.tfrecords",
                       TFRECORDS_DIR + "imagenet_val.tfrecords"]
+
+record_iterator_train1 = list(tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "imagenet_train.tfrecords"))
+record_iterator_train2 = list(tf.python_io.tf_record_iterator(path= TFRECORDS_DIR + "pascal_train.tfrecords"))
+record_iterator_train3 = list(tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "imagenet_val.tfrecords"))
+
+ALL_ITERATORS = record_iterator_train1 + record_iterator_train2 +record_iterator_train3
+
 EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
+EVAL_ITERATOR = tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "pascal_val.tfrecords")
 NETWORK_NAME = 'resnet_v1_50'
 PRETRAINED_MODEL_DIR = "/home/omarreid/selerio/final_year_project/models/test_one"
 RESNET_V1_CHECKPOINT_DIR = "/home/omarreid/selerio/datasets/pre_trained_weights/resnet_v1_50.ckpt"
@@ -107,19 +115,6 @@ def tfrecord_parser(serialized_example):
     """
         Parses a single tf.Example into image and label tensors.
     """
-    print("In TFRecord Parser")
-    # counter = 0
-    # while True:
-    #     print("Counter:")
-    #     print(counter)
-    #     try:
-    #
-    #         break
-    #     except ValueError:
-    #         counter += 1
-    #     except errors.InvalidArgumentError:
-    #         counter += 1
-
     features = tf.parse_single_example(
         serialized_example,
         # Defaults are not specified since both keys are required.
@@ -263,6 +258,8 @@ def eval_input_fn():
 def main(model_dir):
     # Create your own input function - https://www.tensorflow.org/guide/custom_estimators
     # To handle all of our TF Records
+
+
     global MODEL_DIR
     MODEL_DIR = model_dir
     with tf.device("/device:GPU:0"):
@@ -275,10 +272,99 @@ def main(model_dir):
         tensors_to_log = {"loss": "loss", "learning_rate": "learning_rate", }
         logging_hook = tf.train.LoggingTensorHook(tensors=tensors_to_log, every_n_iter=100)
 
-        train_spec = tf.estimator.TrainSpec(input_fn=train_input_fn, hooks=[logging_hook])
-        eval_spec = tf.estimator.EvalSpec(input_fn=eval_input_fn)
+        train_spec = tf.estimator.TrainSpec(input_fn=magic_input_fn, hooks=[logging_hook])
+        eval_spec = tf.estimator.EvalSpec(input_fn=lambda x: magic_input_fn(True), hooks=[logging_hook])
 
         tf.estimator.train_and_evaluate(synth_domain_cnn, train_spec, eval_spec)
+
+
+def magic_input_fn(eval=False):
+    all_features = []
+    all_labels = []
+
+    iterator = ALL_ITERATORS
+
+    if eval:
+        iterator = EVAL_ITERATOR
+
+    for string_record in iterator:
+        example = tf.train.Example()
+        example.ParseFromString(string_record)
+        features = example.features.feature
+
+        rgb_descriptor = features['rgb_descriptor'].float_list.value
+        object_class = features['object_class'].bytes_list.value[0].decode("utf-8")
+        data_id = features['data_id'].bytes_list.value[0].decode("utf-8")
+        cad_index = features['cad_index'].bytes_list.value[0].decode("utf-8")
+
+        img_string = example.features.feature['positive_depth_image'].bytes_list.value[0]
+        img_1d = np.fromstring(img_string, dtype=np.uint8)
+        pos_depth_image = img_1d.reshape((224, 224, 3))
+
+        print(f"RGB Descriptor: {rgb_descriptor}")
+        print(f"Object Class: {object_class}")
+        print(f"Data ID: {data_id}")
+        print(f"CAD Index: {cad_index}")
+
+        all_model_paths = list(glob.glob(OBJ_DIR + "*/*.obj"))  # All classes, all objs
+
+        pos_obj = OBJ_DIR + str(object_class) + str(cad_index)
+
+        print(f"Pos Obj: {pos_obj}")
+
+        random_model_obj_path = np.random.choice(all_model_paths)
+        while pos_obj != random_model_obj_path:
+            random_model_obj_path = np.random.choice(all_model_paths)
+
+        random_cad_index = random_model_obj_path.split("/")[-1][:-4]
+
+        print(f"Random Obj Model: {random_model_obj_path}")
+        print(f"Random Cad Index: {random_cad_index}")
+
+        depth_path = "/home/omarreid/selerio/datasets/random_render/0" + "/" + data_id + "_" + str(
+            random_cad_index) + "_0001.png"
+
+        command = "blender -noaudio --background --python ./blender_render.py -- --specific_viewpoint=True " \
+                  "--cad_index=" + random_cad_index + " --obj_id=" + data_id + " --radians=True " \
+                                                                               "--viewpoint=" + str(
+            0) + "," + str(
+            90) + "," + str(
+            0) + " --bbox=" + str(
+            1) + "," + str(
+            1) + "," + str(
+            1) + " --output_folder /home/omarreid/selerio/datasets/random_render/0" + " "
+
+        full_command = command + random_model_obj_path
+
+        try:
+            subprocess.run(full_command.split(), check=True)
+        except subprocess.CalledProcessError as e:
+            print(e)
+            raise e
+
+        print("Command: " + full_command)
+        negative_depth_image = cv2.imread(depth_path, cv2.IMREAD_COLOR)
+        negative_depth_image = cv2.cvtColor(negative_depth_image, cv2.COLOR_BGR2RGB)
+
+        single_feature = (rgb_descriptor, pos_depth_image, negative_depth_image)
+        single_label = object_class
+
+        all_features.append(single_feature)
+        all_labels.append(single_label)
+
+    all_features = np.array(all_features)
+    all_labels = np.array(all_labels)
+
+    dataset = tf.data.Dataset.from_tensor_slices((all_features, all_labels))
+    dataset = dataset.shuffle(buffer_size=5000)
+    dataset.apply(tf.contrib.data.ignore_errors())
+    dataset = dataset.batch(batch_size=BATCH_SIZE)
+
+    dataset = dataset.repeat(count=10)
+    iterator = dataset.make_one_shot_iterator()
+    features, labels = iterator.get_next()
+
+    return features, labels
 
 
 if __name__ == "__main__":
