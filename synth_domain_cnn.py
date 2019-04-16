@@ -226,7 +226,7 @@ def dataset_base(dataset, shuffle=True):
         dataset = dataset.shuffle(buffer_size=5000)
 
     dataset = dataset.map(map_func=tfrecord_parser, num_parallel_calls=NUM_CPU_CORES)  # Parallelize data transformation
-    dataset = dataset.map(lambda features, label: tuple(tf.py_func(_render_py_function, [features, label])))
+    dataset = dataset.map(lambda features, label: tuple(tf.py_func(_render_py_function, [features, label], [features.dtype, label.dtype])))
     dataset = dataset.map(_resize_function)
     dataset.apply(tf.contrib.data.ignore_errors())
     dataset = dataset.batch(batch_size=BATCH_SIZE)
@@ -259,7 +259,7 @@ def eval_input_fn():
 
 
 @click.command()
-@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/synth_models/model_four",
+@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/synth_models/test",
               help='Path to model to evaluate')
 def main(model_dir):
     # Create your own input function - https://www.tensorflow.org/guide/custom_estimators
