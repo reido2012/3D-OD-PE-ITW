@@ -28,9 +28,9 @@ TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR 
 record_iterator_train1 = tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "imagenet_train.tfrecords")
 record_iterator_train2 = tf.python_io.tf_record_iterator(path= TFRECORDS_DIR + "pascal_train.tfrecords")
 record_iterator_train3 = tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "imagenet_val.tfrecords")
-
+print("Here")
 ALL_ITERATORS = chain(record_iterator_train1, record_iterator_train2, record_iterator_train3)
-
+print("Here 2")
 EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
 EVAL_ITERATOR = tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "pascal_val.tfrecords")
 NETWORK_NAME = 'resnet_v1_50'
