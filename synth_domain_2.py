@@ -47,7 +47,6 @@ class SynthDomainCNN:
         self.learning_rate = learning_rate
         self.batch_size = batch_size
 
-
         # Initialize training dataset
         self.initialize_dataset()
 
@@ -124,7 +123,7 @@ class SynthDomainCNN:
         negative_depth_image = cv2.cvtColor(negative_depth_image, cv2.COLOR_BGR2RGB)
         negative_depth_image = negative_depth_image.astype(np.float32)
 
-        single_feature = np.array([rgb_descriptor, pos_depth_image, negative_depth_image])
+        single_feature = (rgb_descriptor, pos_depth_image, negative_depth_image)
         single_label = str(object_class)
 
         return single_feature, single_label
@@ -139,14 +138,15 @@ class SynthDomainCNN:
 
         self.dataset = tf.data.Dataset.from_generator(
             self.synth_dataset_generator,
-            output_types=(tf.float32, tf.float32, tf.float32, tf.string),
-            output_shapes=(tf.TensorShape([None, 2048]), IMAGE_SHAPE, IMAGE_SHAPE, tf.TensorShape([]))
+            output_types=((tf.float32, tf.float32, tf.float32), tf.string),
+            output_shapes=((tf.TensorShape([None, 2048]), IMAGE_SHAPE, IMAGE_SHAPE), tf.TensorShape([]))
         )
 
         self.dataset = self.dataset.apply(tf.contrib.data.ignore_errors())
         self.dataset = self.dataset.batch(50)
         self.dataset = self.dataset.repeat(count=10)  # Train for count epochs
         self.dataset = self.dataset.make_one_shot_iterator()
+
         return self.dataset.get_next()
 
     # Initialize session
@@ -188,7 +188,7 @@ class SynthDomainCNN:
         learning_rate = tf.train.exponential_decay(
             learning_rate=self.learning_rate,
             global_step=self.global_step,
-            decay_steps=23206,
+            decay_steps=28000,
             decay_rate=0.1,
             staircase=True,
             name="learning_rate"
@@ -269,7 +269,7 @@ def main(model_dir):
         with tf.train.MonitoredTrainingSession(
                 checkpoint_dir=model_dir,
                 hooks=[tf.train.StopAtStepHook(last_step=training_steps)],
-                config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=True),
+                config=tf.ConfigProto(allow_soft_placement=True),
                 save_summaries_steps=None,
                 save_checkpoint_steps=500) as sess:
 
