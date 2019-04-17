@@ -130,7 +130,7 @@ class SynthDomainCNN:
             negative_depth_image = cv2.cvtColor(negative_depth_image, cv2.COLOR_BGR2RGB)
             negative_depth_image = negative_depth_image.astype(np.float32)
 
-            single_feature = np.array(rgb_descriptor, pos_depth_image, negative_depth_image)
+            single_feature = np.array([rgb_descriptor, pos_depth_image, negative_depth_image])
             single_label = str(object_class)
 
             all_features.append(single_feature)
