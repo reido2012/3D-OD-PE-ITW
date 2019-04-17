@@ -156,7 +156,7 @@ def attention_subnetwork(feature_map, end_points, attention_type=_SUPPORTED_ATTE
     Raises:
       ValueError: If unknown attention_type is provided.
     """
-    with tf.variable_scope(_ATTENTION_VARIABLE_SCOPE, values=[feature_map, end_points], reuse=reuse):
+    with tf.variable_scope(_ATTENTION_VARIABLE_SCOPE, values=[feature_map, end_points], reuse=tf.AUTO_REUSE):
         if attention_type not in _SUPPORTED_ATTENTION_TYPES:
             raise ValueError('Unknown attention_type.')
         if attention_type == 'use_l2_normalized_feature':
@@ -195,7 +195,7 @@ def perform_attention(attention_feature_map, feature_map, attention_nonlinear, k
     Raises:
       ValueError: If unknown attention non-linearity type is provided.
     """
-    with tf.variable_scope('attention', values=[attention_feature_map, feature_map], reuse=True):
+    with tf.variable_scope('attention', values=[attention_feature_map, feature_map], reuse=tf.AUTO_REUSE):
         with tf.variable_scope('compute', values=[feature_map]):
             activation_fn_conv1 = tf.nn.relu
             feature_map_conv1 = slim.conv2d(feature_map, 512, kernel, rate=1, activation_fn=activation_fn_conv1,
@@ -206,7 +206,7 @@ def perform_attention(attention_feature_map, feature_map, attention_nonlinear, k
 
         # Set activation of conv2 layer of attention model.
         with tf.variable_scope(
-                'merge', values=[attention_feature_map, attention_score], reuse=True):
+                'merge', values=[attention_feature_map, attention_score], reuse=tf.AUTO_REUSE):
             if attention_nonlinear not in _SUPPORTED_ATTENTION_NONLINEARITY:
                 raise ValueError('Unknown attention non-linearity.')
             if attention_nonlinear == 'softplus':
