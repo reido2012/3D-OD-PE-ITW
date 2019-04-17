@@ -195,7 +195,7 @@ def perform_attention(attention_feature_map, feature_map, attention_nonlinear, k
     Raises:
       ValueError: If unknown attention non-linearity type is provided.
     """
-    with tf.variable_scope('attention', values=[attention_feature_map, feature_map]):
+    with tf.variable_scope('attention', values=[attention_feature_map, feature_map], reuse=True):
         with tf.variable_scope('compute', values=[feature_map]):
             activation_fn_conv1 = tf.nn.relu
             feature_map_conv1 = slim.conv2d(feature_map, 512, kernel, rate=1, activation_fn=activation_fn_conv1,
@@ -206,7 +206,7 @@ def perform_attention(attention_feature_map, feature_map, attention_nonlinear, k
 
         # Set activation of conv2 layer of attention model.
         with tf.variable_scope(
-                'merge', values=[attention_feature_map, attention_score]):
+                'merge', values=[attention_feature_map, attention_score], reuse=True):
             if attention_nonlinear not in _SUPPORTED_ATTENTION_NONLINEARITY:
                 raise ValueError('Unknown attention non-linearity.')
             if attention_nonlinear == 'softplus':
