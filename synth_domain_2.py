@@ -132,6 +132,12 @@ class SynthDomainCNN:
         iterator = ALL_ITERATORS
         for string_record in iterator:
             single_feature, single_label = self.create_element(string_record)
+            print("Single Feature")
+            print(single_feature)
+
+            print("Single Label")
+            print(single_label)
+
             yield single_feature, single_label
 
     def initialize_dataset(self):
@@ -141,7 +147,7 @@ class SynthDomainCNN:
             output_types=((tf.float32, tf.float32, tf.float32), tf.string),
             output_shapes=((tf.TensorShape([None, 2048]), IMAGE_SHAPE, IMAGE_SHAPE), tf.TensorShape([]))
         )
-
+        print(self.dataset.output_shapes)
         self.dataset = self.dataset.apply(tf.contrib.data.ignore_errors())
         self.dataset = self.dataset.batch(50)
         self.dataset = self.dataset.repeat(count=10)  # Train for count epochs
