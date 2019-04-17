@@ -59,10 +59,12 @@ def real_domain_attention_cnn_model_fn(features, labels, mode):
     with slim.arg_scope(resnet_v1.resnet_arg_scope()):
         # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
         network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=is_training)
-        _, end_points = network_fn(features)
+        image_descriptors, end_points = network_fn(features)
 
     # image_descriptors = tf.identity(image_descriptors, name="image_descriptors")
     feature_map = end_points['resnet_v1_50/block4']
+    print("Descriptors Shape")
+    print(image_descriptors.shape)
     print("Feature Map Shape")
     print(feature_map.shape)
     with slim.arg_scope([slim.batch_norm], is_training=True):
