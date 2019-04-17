@@ -8,12 +8,14 @@ import cv2
 import os
 import scipy.stats as st
 from scipy import ndimage
+import os
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 
 from nets import nets_factory, resnet_v1
 from real_domain_cnn import pose_loss, train_input_fn
 
 slim = tf.contrib.slim
-tf.logging.set_verbosity(tf.logging.INFO)
+tf.logging.set_verbosity(tf.logging.WARN)
 
 TFRECORDS_DIR = "/home/omarreid/selerio/datasets/real_domain_tfrecords/"
 TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR + "pascal_train.tfrecords",
@@ -86,11 +88,12 @@ def real_domain_attention_cnn_model_fn(features, labels, mode):
     print(selected_features.shape)
 
     print("Selected Features 2 Shape")
+    selected_features_2 = tf.Print(selected_features_2, [selected_features])
     print(selected_features_2.shape)
     # Add a dense layer to get the 19 neuron linear output layer
     logits = tf.layers.dense(selected_features, 19)
     print("Logits Shape")
-    print(logits.shape)
+    logits = tf.Print(logits, [logits])
     logits = tf.squeeze(logits, name='2d_predictions')
 
     predictions = {
