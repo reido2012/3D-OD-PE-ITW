@@ -25,14 +25,10 @@ TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords/"
 TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR + "pascal_train.tfrecords",
                       TFRECORDS_DIR + "imagenet_val.tfrecords"]
 
-print("ghfyguhijo;klkjhfgxdfhjkl")
-
 record_iterator_train1 = tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "imagenet_train.tfrecords")
 record_iterator_train2 = tf.python_io.tf_record_iterator(path= TFRECORDS_DIR + "pascal_train.tfrecords")
 record_iterator_train3 = tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "imagenet_val.tfrecords")
-print("Here")
 ALL_ITERATORS = chain(record_iterator_train1, record_iterator_train2, record_iterator_train3)
-print("Here 2")
 EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
 EVAL_ITERATOR = tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "pascal_val.tfrecords")
 NETWORK_NAME = 'resnet_v1_50'
@@ -307,6 +303,8 @@ def magic_input_fn():
         pos_depth_image = img_1d.reshape((224, 224, 3))
 
         print(f"RGB Descriptor: {rgb_descriptor}")
+        print(f"RGB Descriptor Shape: {rgb_descriptor.shape}")
+
         print(f"Object Class: {object_class}")
         print(f"Data ID: {data_id}")
         print(f"CAD Index: {cad_index}")
@@ -352,7 +350,7 @@ def magic_input_fn():
         negative_depth_image = cv2.cvtColor(negative_depth_image, cv2.COLOR_BGR2RGB)
 
         single_feature = (rgb_descriptor, pos_depth_image, negative_depth_image)
-        single_label = object_class
+        single_label = str(object_class)
 
         all_features.append(single_feature)
         all_labels.append(single_label)
@@ -364,12 +362,21 @@ def magic_input_fn():
     dataset = dataset.shuffle(buffer_size=5000)
     dataset.apply(tf.contrib.data.ignore_errors())
     dataset = dataset.batch(batch_size=BATCH_SIZE)
+    print("DS Ouput Shapes")
+    print(dataset.output_shapes)
 
     dataset = dataset.repeat(count=10)
     iterator = dataset.make_one_shot_iterator()
     features, labels = iterator.get_next()
 
     return features, labels
+
+
+
+
+"EVAL!!!!!!!!!1"
+
+
 
 def magic_input_eval_fn():
     all_features = []
@@ -455,6 +462,7 @@ def magic_input_eval_fn():
     print(dataset.output_shapes)
     dataset = dataset.repeat(count=10)
     iterator = dataset.make_one_shot_iterator()
+
     features, labels = iterator.get_next()
 
     return features, labels
