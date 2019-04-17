@@ -238,3 +238,7 @@ def main(model_dir):
         logging_hook = tf.train.LoggingTensorHook(tensors=tensors_to_log, every_n_iter=100)
 
         real_domain_cnn.train(input_fn=train_input_fn, hooks=[logging_hook])
+
+
+if __name__ == "__main__":
+    main()
