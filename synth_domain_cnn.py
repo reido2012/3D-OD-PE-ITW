@@ -21,6 +21,7 @@ REG_CONSTANT = 1e-3
 MODEL_DIR = ""
 PATH_TO_RD_META = ""
 STARTING_LR = 1e-4
+IMAGE_SHAPE = tf.TensorShape([None, 224, 224, 3])
 TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords/"
 TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR + "pascal_train.tfrecords",
                       TFRECORDS_DIR + "imagenet_val.tfrecords"]
@@ -31,11 +32,11 @@ record_iterator_train3 = tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "i
 ALL_ITERATORS = chain(record_iterator_train1, record_iterator_train2, record_iterator_train3)
 EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
 EVAL_ITERATOR = tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "pascal_val.tfrecords")
+DATASET_DIR = osp.expanduser('/home/omarreid/selerio/datasets/PASCAL3D+_release1.1')
+OBJ_DIR = DATASET_DIR + "/OBJ/"
 NETWORK_NAME = 'resnet_v1_50'
 PRETRAINED_MODEL_DIR = "/home/omarreid/selerio/final_year_project/models/test_one"
 RESNET_V1_CHECKPOINT_DIR = "/home/omarreid/selerio/datasets/pre_trained_weights/resnet_v1_50.ckpt"
-DATASET_DIR = osp.expanduser('/home/omarreid/selerio/datasets/PASCAL3D+_release1.1')
-OBJ_DIR = DATASET_DIR + "/OBJ/"
 
 
 def synth_domain_cnn_model_fn(features, labels, mode):
@@ -180,8 +181,15 @@ def train_input_fn():
     """
     Builds an input pipeline that yields batches of feature and label pairs
     """
-    dataset = tf.data.TFRecordDataset(TRAINING_TFRECORDS)
-    dataset = dataset_base(dataset)
+    dataset = tf.data.Dataset.from_generator(
+        synth_dataset_generator,
+        output_types=(tf.float32, tf.float32, tf.float32, tf.string),
+        output_shapes=(tf.TensorShape([None, 2048]), IMAGE_SHAPE, IMAGE_SHAPE, tf.TensorShape([]))
+    )
+
+    dataset.apply(tf.contrib.data.ignore_errors())
+    dataset = dataset.batch(50)
+    # dataset = dataset.prefetch(buffer_size=6)
     dataset = dataset.repeat(count=10)  # Train for count epochs
 
     iterator = dataset.make_one_shot_iterator()
@@ -222,11 +230,91 @@ def main(model_dir):
         tensors_to_log = {"loss": "loss", "learning_rate": "learning_rate", }
         logging_hook = tf.train.LoggingTensorHook(tensors=tensors_to_log, every_n_iter=100)
 
-        train_spec = tf.estimator.TrainSpec(input_fn=magic_input_fn, hooks=[logging_hook])
+        train_spec = tf.estimator.TrainSpec(input_fn=train_input_fn, hooks=[logging_hook])
         print("Post Train Spec")
-        eval_spec = tf.estimator.EvalSpec(input_fn=magic_input_eval_fn, hooks=[logging_hook])
+        eval_spec = tf.estimator.EvalSpec(input_fn=eval_input_fn, hooks=[logging_hook])
 
         tf.estimator.train_and_evaluate(synth_domain_cnn, train_spec, eval_spec)
+
+
+def create_element(string_record):
+    example = tf.train.Example()
+    example.ParseFromString(string_record)
+    features = example.features.feature
+
+    rgb_descriptor = np.array(features['rgb_descriptor'].float_list.value)
+    rgb_descriptor = rgb_descriptor.astype(np.float32)
+
+    object_class = features['object_class'].bytes_list.value[0].decode("utf-8")
+
+    data_id = features['data_id'].bytes_list.value[0].decode("utf-8")
+
+    cad_index = features['cad_index'].bytes_list.value[0].decode("utf-8")
+
+    img_string = example.features.feature['positive_depth_image'].bytes_list.value[0]
+    img_1d = np.fromstring(img_string, dtype=np.uint8)
+    pos_depth_image = img_1d.reshape((224, 224, 3))
+    pos_depth_image = pos_depth_image.astype(np.float32)
+
+    print(f"RGB Descriptor: {rgb_descriptor}")
+    print(f"RGB Descriptor Shape: {rgb_descriptor.shape}")
+
+    print(f"Object Class: {object_class}")
+    print(f"Data ID: {data_id}")
+    print(f"CAD Index: {cad_index}")
+
+    all_model_paths = list(glob.glob(OBJ_DIR + "*/*.obj"))  # All classes, all objs
+
+    pos_obj = OBJ_DIR + str(object_class) + "/" + str(cad_index) + ".obj"
+
+    print(f"Pos Obj: {pos_obj}")
+
+    random_model_obj_path = np.random.choice(all_model_paths)
+    while pos_obj == random_model_obj_path:
+        random_model_obj_path = np.random.choice(all_model_paths)
+
+    random_cad_index = random_model_obj_path.split("/")[-1][:-4]
+
+    print(f"Random Obj Model: {random_model_obj_path}")
+    print(f"Random Cad Index: {random_cad_index}")
+
+    depth_path = "/home/omarreid/selerio/datasets/random_render/0" + "/" + data_id + "_" + str(
+        random_cad_index) + "_0001.png"
+
+    command = "blender -noaudio --background --python ./blender_render.py -- --specific_viewpoint=True " \
+              "--cad_index=" + random_cad_index + " --obj_id=" + data_id + " --radians=True " \
+                                                                           "--viewpoint=" + str(
+        0) + "," + str(
+        90) + "," + str(
+        0) + " --bbox=" + str(
+        1) + "," + str(
+        1) + "," + str(
+        1) + " --output_folder /home/omarreid/selerio/datasets/random_render/0" + " "
+
+    full_command = command + random_model_obj_path
+
+    try:
+        subprocess.run(full_command.split(), check=True)
+    except subprocess.CalledProcessError as e:
+        print(e)
+        raise e
+
+    print("Command: " + full_command)
+    negative_depth_image = cv2.imread(depth_path, cv2.IMREAD_COLOR)
+    negative_depth_image = cv2.cvtColor(negative_depth_image, cv2.COLOR_BGR2RGB)
+    negative_depth_image = negative_depth_image.astype(np.float32)
+
+    single_feature = np.array([rgb_descriptor, pos_depth_image, negative_depth_image])
+    single_label = str(object_class)
+
+    return single_feature, single_label
+
+
+def synth_dataset_generator():
+    iterator = ALL_ITERATORS
+    for string_record in iterator:
+        single_feature, single_label = create_element(string_record)
+        yield single_feature, single_label
 
 
 def magic_input_fn():
@@ -237,95 +325,9 @@ def magic_input_fn():
     print("Inside Magic Input FN")
 
     for string_record in iterator:
-        example = tf.train.Example()
-        example.ParseFromString(string_record)
-        features = example.features.feature
-
-        rgb_descriptor = np.array(features['rgb_descriptor'].float_list.value)
-        rgb_descriptor = rgb_descriptor.astype(np.float32)
-
-        object_class = features['object_class'].bytes_list.value[0].decode("utf-8")
-
-        data_id = features['data_id'].bytes_list.value[0].decode("utf-8")
-
-        cad_index = features['cad_index'].bytes_list.value[0].decode("utf-8")
-
-        img_string = example.features.feature['positive_depth_image'].bytes_list.value[0]
-        img_1d = np.fromstring(img_string, dtype=np.uint8)
-        pos_depth_image = img_1d.reshape((224, 224, 3))
-        pos_depth_image = pos_depth_image.astype(np.float32)
-
-        print(f"RGB Descriptor: {rgb_descriptor}")
-        print(f"RGB Descriptor Shape: {rgb_descriptor.shape}")
-
-        print(f"Object Class: {object_class}")
-        print(f"Data ID: {data_id}")
-        print(f"CAD Index: {cad_index}")
-
-        all_model_paths = list(glob.glob(OBJ_DIR + "*/*.obj"))  # All classes, all objs
-
-        pos_obj = OBJ_DIR + str(object_class) + "/" + str(cad_index) + ".obj"
-
-        print(f"Pos Obj: {pos_obj}")
-
-        random_model_obj_path = np.random.choice(all_model_paths)
-        while pos_obj == random_model_obj_path:
-            random_model_obj_path = np.random.choice(all_model_paths)
-
-        random_cad_index = random_model_obj_path.split("/")[-1][:-4]
-
-        print(f"Random Obj Model: {random_model_obj_path}")
-        print(f"Random Cad Index: {random_cad_index}")
-
-        depth_path = "/home/omarreid/selerio/datasets/random_render/0" + "/" + data_id + "_" + str(
-            random_cad_index) + "_0001.png"
-
-        command = "blender -noaudio --background --python ./blender_render.py -- --specific_viewpoint=True " \
-                  "--cad_index=" + random_cad_index + " --obj_id=" + data_id + " --radians=True " \
-                                                                               "--viewpoint=" + str(
-            0) + "," + str(
-            90) + "," + str(
-            0) + " --bbox=" + str(
-            1) + "," + str(
-            1) + "," + str(
-            1) + " --output_folder /home/omarreid/selerio/datasets/random_render/0" + " "
-
-        full_command = command + random_model_obj_path
-
-        try:
-            subprocess.run(full_command.split(), check=True)
-        except subprocess.CalledProcessError as e:
-            print(e)
-            raise e
-
-        print("Command: " + full_command)
-        negative_depth_image = cv2.imread(depth_path, cv2.IMREAD_COLOR)
-        negative_depth_image = cv2.cvtColor(negative_depth_image, cv2.COLOR_BGR2RGB)
-        negative_depth_image = negative_depth_image.astype(np.float32)
-
-        single_feature = np.array(rgb_descriptor, pos_depth_image, negative_depth_image)
-        single_label = str(object_class)
-
+        single_feature, single_label = create_element(string_record)
         all_features.append(single_feature)
         all_labels.append(single_label)
-
-    all_features = np.array(all_features)
-    all_labels = np.array(all_labels)
-
-    dataset = tf.data.Dataset.from_tensor_slices((all_features, all_labels))
-    dataset = dataset.shuffle(buffer_size=5000)
-    dataset.apply(tf.contrib.data.ignore_errors())
-    dataset = dataset.batch(batch_size=BATCH_SIZE)
-    print("DS Ouput Shapes")
-    print(dataset.output_shapes)
-
-    dataset = dataset.repeat(count=10)
-    iterator = dataset.make_one_shot_iterator()
-    features, labels = iterator.get_next()
-
-    return features, labels
-
-
 
 
 "EVAL!!!!!!!!!1"
@@ -341,89 +343,26 @@ def magic_input_eval_fn():
     print("Inside Magic Input FN")
 
     for string_record in iterator:
-        example = tf.train.Example()
-        example.ParseFromString(string_record)
-        features = example.features.feature
-
-        rgb_descriptor = features['rgb_descriptor'].float_list.value
-        object_class = features['object_class'].bytes_list.value[0].decode("utf-8")
-        data_id = features['data_id'].bytes_list.value[0].decode("utf-8")
-        cad_index = features['cad_index'].bytes_list.value[0].decode("utf-8")
-
-        img_string = example.features.feature['positive_depth_image'].bytes_list.value[0]
-        img_1d = np.fromstring(img_string, dtype=np.uint8)
-        pos_depth_image = img_1d.reshape((224, 224, 3))
-
-        print(f"RGB Descriptor: {rgb_descriptor}")
-        print(f"Object Class: {object_class}")
-        print(f"Data ID: {data_id}")
-        print(f"CAD Index: {cad_index}")
-
-        all_model_paths = list(glob.glob(OBJ_DIR + "*/*.obj"))  # All classes, all objs
-
-        pos_obj = OBJ_DIR + str(object_class) + "/" + str(cad_index) + ".obj"
-
-        print(f"Pos Obj: {pos_obj}")
-
-        random_model_obj_path = np.random.choice(all_model_paths)
-        while pos_obj == random_model_obj_path:
-            random_model_obj_path = np.random.choice(all_model_paths)
-
-        random_cad_index = random_model_obj_path.split("/")[-1][:-4]
-
-        print(f"Random Obj Model: {random_model_obj_path}")
-        print(f"Random Cad Index: {random_cad_index}")
-
-        depth_path = "/home/omarreid/selerio/datasets/random_render/0" + "/" + data_id + "_" + str(
-            random_cad_index) + "_0001.png"
-
-        command = "blender -noaudio --background --python ./blender_render.py -- --specific_viewpoint=True " \
-                  "--cad_index=" + random_cad_index + " --obj_id=" + data_id + " --radians=True " \
-                                                                               "--viewpoint=" + str(
-            0) + "," + str(
-            90) + "," + str(
-            0) + " --bbox=" + str(
-            1) + "," + str(
-            1) + "," + str(
-            1) + " --output_folder /home/omarreid/selerio/datasets/random_render/0" + " "
-
-        full_command = command + random_model_obj_path
-
-        try:
-            subprocess.run(full_command.split(), check=True)
-        except subprocess.CalledProcessError as e:
-            print(e)
-            raise e
-
-        print("Command: " + full_command)
-        negative_depth_image = cv2.imread(depth_path, cv2.IMREAD_COLOR)
-        negative_depth_image = cv2.cvtColor(negative_depth_image, cv2.COLOR_BGR2RGB)
-
-        single_feature = (rgb_descriptor, pos_depth_image, negative_depth_image)
-        single_label = str(object_class)
-
+        single_feature, single_label = create_element(string_record)
         all_features.append(single_feature)
         all_labels.append(single_label)
 
-    all_features = np.array(all_features)
-    all_labels = np.array(all_labels)
 
-    print("Feature and Label Len: ")
-    print(len(all_features))
-    print(len(all_labels))
-    dataset = tf.data.Dataset.from_tensor_slices((all_features, all_labels))
-    dataset = dataset.shuffle(buffer_size=5000)
-    dataset.apply(tf.contrib.data.ignore_errors())
-    dataset = dataset.batch(batch_size=BATCH_SIZE)
-    print("DS Ouput Shapes")
-    print(dataset.output_shapes)
-    dataset = dataset.repeat(count=10)
-    iterator = dataset.make_one_shot_iterator()
-
-    features, labels = iterator.get_next()
-
-    return features, labels
-
-
+#
+# print("Feature and Label Len: ")
+#     print(len(all_features))
+#     print(len(all_labels))
+#     dataset = tf.data.Dataset.from_tensor_slices((all_features, all_labels))
+#     dataset = dataset.shuffle(buffer_size=5000)
+#     dataset.apply(tf.contrib.data.ignore_errors())
+#     dataset = dataset.batch(batch_size=BATCH_SIZE)
+#     print("DS Ouput Shapes")
+#     print(dataset.output_shapes)
+#     dataset = dataset.repeat(count=10)
+#     iterator = dataset.make_one_shot_iterator()
+#
+#     features, labels = iterator.get_next()
+#
+#     return features, labels
 if __name__ == "__main__":
     main()
