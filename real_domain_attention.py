@@ -84,6 +84,8 @@ def real_domain_attention_cnn_model_fn(features, labels, mode):
     logits = tf.layers.dense(selected_features, 19)
     logits = tf.squeeze(logits, name='2d_predictions')
 
+    logits = tf.reshape(logits, [None, 19])
+
     predictions = {
         # Generate predictions (for PREDICT and EVAL mode)
         "2d_prediction": logits,
