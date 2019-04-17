@@ -61,7 +61,8 @@ def real_domain_attention_cnn_model_fn(features, labels, mode):
 
     # image_descriptors = tf.identity(image_descriptors, name="image_descriptors")
     feature_map = end_points['resnet_v1_50/block4']
-
+    print("Feature Map Shape")
+    print(feature_map.shape)
     with slim.arg_scope([slim.batch_norm], is_training=True):
         _, attention_prob, _, end_points = attention_subnetwork(feature_map, end_points,
                                                                 attention_type=
@@ -72,12 +73,13 @@ def real_domain_attention_cnn_model_fn(features, labels, mode):
 
     attention = tf.reshape(attention_prob, [-1])
     feature_map = tf.reshape(feature_map, [-1, 2048])
-    print(feature_map.shape)
+
     # Use attention score to select feature vectors.
     indices = tf.reshape(tf.where(attention >= ABS_THRESH), [-1])
     selected_features = tf.gather(feature_map, indices)
 
-
+    print("Selected Features Shape")
+    print(selected_features.shape)
     # Add a dense layer to get the 19 neuron linear output layer
     logits = tf.layers.dense(selected_features, 19)
     logits = tf.squeeze(logits, name='2d_predictions')
