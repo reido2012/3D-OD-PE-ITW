@@ -1,7 +1,12 @@
 import tensorflow as tf
 import click
 import glob
+import cv2
+import subprocess
+import numpy as np
+import os.path as osp
 from nets import nets_factory, resnet_v1
+from itertools import chain
 
 slim = tf.contrib.slim
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -14,10 +19,18 @@ REG_CONSTANT = 1e-3
 MODEL_DIR = ""
 PATH_TO_RD_META = ""
 STARTING_LR = 1e-4
-TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords_new/"
+TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords/"
 TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR + "pascal_train.tfrecords",
                       TFRECORDS_DIR + "imagenet_val.tfrecords"]
+
+record_iterator_train1 = tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "imagenet_train.tfrecords")
+record_iterator_train2 = tf.python_io.tf_record_iterator(path= TFRECORDS_DIR + "pascal_train.tfrecords")
+record_iterator_train3 = tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "imagenet_val.tfrecords")
+ALL_ITERATORS = chain(record_iterator_train1, record_iterator_train2, record_iterator_train3)
 EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
+EVAL_ITERATOR = tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "pascal_val.tfrecords")
+DATASET_DIR = osp.expanduser('/home/omarreid/selerio/datasets/PASCAL3D+_release1.1')
+OBJ_DIR = DATASET_DIR + "/OBJ/"
 NETWORK_NAME = 'resnet_v1_50'
 PRETRAINED_MODEL_DIR = "/home/omarreid/selerio/final_year_project/models/test_one"
 RESNET_V1_CHECKPOINT_DIR = "/home/omarreid/selerio/datasets/pre_trained_weights/resnet_v1_50.ckpt"
@@ -26,9 +39,10 @@ RESNET_V1_CHECKPOINT_DIR = "/home/omarreid/selerio/datasets/pre_trained_weights/
 class SynthDomainCNN:
 
     def __init__(self, learning_rate, batch_size):
-        # self.x_data = x_data
-        # self.y_data = y_data
-        # self.synth_dataset = synth_ds .
+
+        self.positive_depth_images = tf.placeholder(tf.float32, [None, 224, 224, 3])
+        self.negative_depth_images = tf.placeholder(tf.float32, [None, 224, 224, 3])
+        self.rgb_descriptors = tf.placeholder(tf.float32, [None, 2048])
         self.learning_rate = learning_rate
         self.batch_size = batch_size
 
@@ -43,12 +57,103 @@ class SynthDomainCNN:
         self.build_model()
 
     def initialize_dataset(self):
-        self.dataset = tf.data.TFRecordDataset(TRAINING_TFRECORDS)
-        self.dataset = self.dataset.map(map_func=tfrecord_parser, num_parallel_calls=NUM_CPU_CORES)
-        self.dataset = self.dataset.apply(tf.contrib.data.ignore_errors())
-        self.dataset = self.dataset.batch(self.batch_size)
-        self.dataset = self.dataset.prefetch(5)
-        self.dataset = self.dataset.make_one_shot_iterator()
+        all_features = []
+        all_labels = []
+
+        iterator = ALL_ITERATORS
+        print("Inside Magic Input FN")
+
+        for string_record in iterator:
+            example = tf.train.Example()
+            example.ParseFromString(string_record)
+            features = example.features.feature
+
+            rgb_descriptor = np.array(features['rgb_descriptor'].float_list.value)
+            rgb_descriptor = rgb_descriptor.astype(np.float32)
+
+            object_class = features['object_class'].bytes_list.value[0].decode("utf-8")
+
+            data_id = features['data_id'].bytes_list.value[0].decode("utf-8")
+
+            cad_index = features['cad_index'].bytes_list.value[0].decode("utf-8")
+
+            img_string = example.features.feature['positive_depth_image'].bytes_list.value[0]
+            img_1d = np.fromstring(img_string, dtype=np.uint8)
+            pos_depth_image = img_1d.reshape((224, 224, 3))
+            pos_depth_image = pos_depth_image.astype(np.float32)
+
+            print(f"RGB Descriptor: {rgb_descriptor}")
+            print(f"RGB Descriptor Shape: {rgb_descriptor.shape}")
+
+            print(f"Object Class: {object_class}")
+            print(f"Data ID: {data_id}")
+            print(f"CAD Index: {cad_index}")
+
+            all_model_paths = list(glob.glob(OBJ_DIR + "*/*.obj"))  # All classes, all objs
+
+            pos_obj = OBJ_DIR + str(object_class) + "/" + str(cad_index) + ".obj"
+
+            print(f"Pos Obj: {pos_obj}")
+
+            random_model_obj_path = np.random.choice(all_model_paths)
+            while pos_obj == random_model_obj_path:
+                random_model_obj_path = np.random.choice(all_model_paths)
+
+            random_cad_index = random_model_obj_path.split("/")[-1][:-4]
+
+            print(f"Random Obj Model: {random_model_obj_path}")
+            print(f"Random Cad Index: {random_cad_index}")
+
+            depth_path = "/home/omarreid/selerio/datasets/random_render/0" + "/" + data_id + "_" + str(
+                random_cad_index) + "_0001.png"
+
+            command = "blender -noaudio --background --python ./blender_render.py -- --specific_viewpoint=True " \
+                      "--cad_index=" + random_cad_index + " --obj_id=" + data_id + " --radians=True " \
+                                                                                   "--viewpoint=" + str(
+                0) + "," + str(
+                90) + "," + str(
+                0) + " --bbox=" + str(
+                1) + "," + str(
+                1) + "," + str(
+                1) + " --output_folder /home/omarreid/selerio/datasets/random_render/0" + " "
+
+            full_command = command + random_model_obj_path
+
+            try:
+                subprocess.run(full_command.split(), check=True)
+            except subprocess.CalledProcessError as e:
+                print(e)
+                raise e
+
+            print("Command: " + full_command)
+            negative_depth_image = cv2.imread(depth_path, cv2.IMREAD_COLOR)
+            negative_depth_image = cv2.cvtColor(negative_depth_image, cv2.COLOR_BGR2RGB)
+            negative_depth_image = negative_depth_image.astype(np.float32)
+
+            single_feature = np.array(rgb_descriptor, pos_depth_image, negative_depth_image)
+            single_label = str(object_class)
+
+            all_features.append(single_feature)
+            all_labels.append(single_label)
+
+        all_features = np.array(all_features)
+        all_labels = np.array(all_labels)
+
+        print(f"All Features Shape: {all_features.shape}")
+        print(f"All Labels Shape: {all_labels.shape}")
+
+        features_placeholder = tf.placeholder(all_features.dtype, all_labels.shape)
+        labels_placeholder = tf.placeholder(all_labels.dtype, all_labels.shape)
+
+        dataset = tf.data.Dataset.from_tensor_slices((features_placeholder, labels_placeholder))
+        dataset = dataset.shuffle(buffer_size=5000)
+        dataset.apply(tf.contrib.data.ignore_errors())
+        dataset = dataset.batch(batch_size=BATCH_SIZE)
+        print("DS Ouput Shapes")
+        print(dataset.output_shapes)
+
+        dataset = dataset.repeat(count=10)
+        self.dataset = dataset.make_one_shot_iterator()
         self.dataset = self.dataset.get_next()
 
     # Initialize session
@@ -149,92 +254,15 @@ class SynthDomainCNN:
                 print("Step %d:  %.10f" % (step, loss))
 
 
-def tfrecord_parser(serialized_example):
-    """
-        Parses a single tf.Example into image and label tensors.
-    """
-
-    features = tf.parse_single_example(
-        serialized_example,
-        # Defaults are not specified since both keys are required.
-        features={
-            'positive_depth_image': tf.FixedLenFeature([], tf.string),
-            'rgb_descriptor': tf.FixedLenFeature([], tf.float32),
-            'img/neg/depth/0': tf.FixedLenFeature([], tf.string),
-            'num_negative_depth_images': tf.FixedLenFeature([], tf.int64),
-            'object_class': tf.FixedLenFeature([], tf.string)
-        }
-    )
-
-    pos_depth_image = convert_string_to_image(features['positive_depth_image'])
-    negative_depth_image = convert_string_to_image(features['img/neg/depth/0'])
-    object_class = features['object_class']
-    rgb_descriptor = tf.cast(features['rgb_descriptor'], tf.float32)
-
-    return (rgb_descriptor, pos_depth_image, negative_depth_image), object_class
-
-
-def convert_string_to_image(image_string):
-    """
-    Converts image string extracted from TFRecord to an image
-
-    :param image_string: String that represents an image
-    :return: The image represented by the string
-    """
-    greyscale_size = tf.constant(50176)
-    greyscale_channel = tf.constant(1)
-
-    image = tf.decode_raw(image_string, tf.uint8)
-    image = tf.to_float(image)
-
-    # Image is not in correct shape so
-    shape_pred = tf.cast(tf.equal(tf.size(image), greyscale_size), tf.bool)
-    image_shape = tf.cond(shape_pred, lambda: tf.stack([IMAGE_SIZE, IMAGE_SIZE, 1]),
-                          lambda: tf.stack([IMAGE_SIZE, IMAGE_SIZE, 3]))
-
-    input_image = tf.reshape(image, image_shape)
-
-    channel_pred = tf.cast(tf.equal(tf.shape(input_image)[2], greyscale_channel), tf.bool)
-    input_image = tf.cond(channel_pred, lambda: tf.image.grayscale_to_rgb(input_image), lambda: input_image)
-    input_image = tf.reshape(input_image, (224, 224, 3))
-
-    return input_image
-
-
-def dataset_base(dataset, shuffle=True):
-    if shuffle:
-        dataset = dataset.shuffle(buffer_size=10000)
-
-    dataset = dataset.map(map_func=tfrecord_parser, num_parallel_calls=NUM_CPU_CORES)  # Parallelize data transformation
-    dataset.apply(tf.contrib.data.ignore_errors())
-    dataset = dataset.batch(batch_size=BATCH_SIZE)
-    return dataset.prefetch(buffer_size=2)
-
-
-def get_train_iterator():
-    """
-    Builds an input pipeline that yields batches of feature and label pairs
-    """
-    dataset = tf.data.TFRecordDataset(TRAINING_TFRECORDS)
-    dataset = dataset_base(dataset)
-    dataset = dataset.repeat(count=10)  # Train for count epochs
-
-    iterator = dataset.make_one_shot_iterator()
-    # features, labels = iterator.get_next()
-    # return features, labels
-    return iterator
-
-
 @click.command()
-@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/synth_models/model_test",
+@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/synth_models/test_2",
               help='Path to model to evaluate')
 def main(model_dir):
-    # Create your own input function - https://www.tensorflow.org/guide/custom_estimators
-    # To handle all of our TF Records
+
     global MODEL_DIR
     MODEL_DIR = model_dir
     with tf.device("/device:GPU:0"):
-        config = tf.ConfigProto(allow_soft_placement=True)
+
         # Specify initial learning rate
         learning_rate = STARTING_LR
 
