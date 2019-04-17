@@ -72,10 +72,11 @@ def real_domain_attention_cnn_model_fn(features, labels, mode):
 
     attention = tf.reshape(attention_prob, [-1])
     feature_map = tf.reshape(feature_map, [-1, 2048])
-
+    print(feature_map.shape)
     # Use attention score to select feature vectors.
     indices = tf.reshape(tf.where(attention >= ABS_THRESH), [-1])
     selected_features = tf.gather(feature_map, indices)
+
 
     # Add a dense layer to get the 19 neuron linear output layer
     logits = tf.layers.dense(selected_features, 19)
