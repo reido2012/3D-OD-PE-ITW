@@ -276,7 +276,6 @@ def main(model_dir):
         with tf.train.MonitoredTrainingSession(
                 checkpoint_dir=model_dir,
                 hooks=[tf.train.StopAtStepHook(last_step=training_steps)],
-                config=config,
                 save_summaries_steps=None,
                 save_checkpoint_steps=500) as sess:
 
