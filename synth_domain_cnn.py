@@ -43,6 +43,7 @@ OBJ_DIR = DATASET_DIR + "/OBJ/"
 
 
 def synth_domain_cnn_model_fn(features, labels, mode):
+    print(features)
     rgb_descriptors, positive_depth_images, negative_depth_images = features
 
     with tf.variable_scope('synth_domain'):
