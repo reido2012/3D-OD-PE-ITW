@@ -107,6 +107,11 @@ def real_domain_attention_cnn_model_fn(features, labels, mode):
     tf.train.init_from_checkpoint(checkpoint_path, {v.name.split(':')[0]: v for v in variables_to_restore})
 
     # create a pose_loss function so that we can get the loss
+    print("Logits")
+    print(logits)
+    print("Labels")
+    print(labels)
+
     loss = pose_loss(labels, logits)
 
     # Configure the Training Op (for TRAIN mode)
