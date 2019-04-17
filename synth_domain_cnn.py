@@ -166,62 +166,11 @@ def convert_string_to_image(image_string, standardize=True):
     return input_image
 
 
-# Use a custom OpenCV function to read the image, instead of the standard
-# TensorFlow `tf.read_file()` operation.
-def _render_py_function(features, label):
-    rgb_descriptor, pos_depth_image, negative_depth_image, cad_index, data_id = features
-    # rot_x, rot_y, rot_z,, bbox_dims
-    # x_dim, y_dim, z_dim = bbox_dims
-    object_class = label
-
-    all_model_paths = list(glob.glob(OBJ_DIR + "*/*.obj"))  # All classes, all objs
-
-    random_model_obj_path = np.random.choice(all_model_paths)
-    while object_class in random_model_obj_path and cad_index in random_model_obj_path:
-        random_model_obj_path = np.random.choice(all_model_paths)
-
-    random_cad_index = random_model_obj_path.split("/")[-1][:-4]
-
-    depth_path = "/home/omarreid/selerio/datasets/random_render/0" + "/" + data_id + "_" + str(random_cad_index) + "_0001.png"
-
-    command = "blender -noaudio --background --python ./blender_render.py -- --specific_viewpoint=True " \
-              "--cad_index=" + random_cad_index + " --obj_id=" + data_id + " --radians=True " \
-                                                                           "--viewpoint=" + str(
-        0) + "," + str(
-        90) + "," + str(
-        0) + " --bbox=" + str(
-        1) + "," + str(
-        1) + "," + str(
-        1) + " --output_folder /home/omarreid/selerio/datasets/random_render/0" + " "
-
-    full_command = command + random_model_obj_path
-
-    try:
-        subprocess.run(full_command.split(), check=True)
-    except subprocess.CalledProcessError as e:
-        print(e)
-        raise e
-
-    print("Command: " + full_command)
-    negative_depth_image = cv2.imread(depth_path, cv2.IMREAD_COLOR)
-    negative_depth_image = cv2.cvtColor(negative_depth_image, cv2.COLOR_BGR2RGB)
-
-    return (rgb_descriptor, pos_depth_image, negative_depth_image), label
-
-
-def _resize_function(features, label):
-    rgb_descriptor, pos_depth_image, negative_depth_image = features
-    negative_depth_image = tf.image.resize_images(negative_depth_image, [224, 224, 3])
-    return (rgb_descriptor, pos_depth_image, negative_depth_image), label
-
-
 def dataset_base(dataset, shuffle=True):
     if shuffle:
         dataset = dataset.shuffle(buffer_size=5000)
 
     dataset = dataset.map(map_func=tfrecord_parser, num_parallel_calls=NUM_CPU_CORES)  # Parallelize data transformation
-    dataset = dataset.map(lambda features, label: tuple(tf.py_func(_render_py_function, [np.array([features]), label], [tf.float32, tf.float32, tf.float32, tf.string, tf.string, tf.string])))
-    dataset = dataset.map(_resize_function)
     dataset.apply(tf.contrib.data.ignore_errors())
     dataset = dataset.batch(batch_size=BATCH_SIZE)
     return dataset.prefetch(buffer_size=6)
@@ -286,7 +235,6 @@ def magic_input_fn():
 
     iterator = ALL_ITERATORS
     print("Inside Magic Input FN")
-    print(len(list(iterator)))
 
     for string_record in iterator:
         example = tf.train.Example()
@@ -294,6 +242,7 @@ def magic_input_fn():
         features = example.features.feature
 
         rgb_descriptor = features['rgb_descriptor'].float_list.value
+        rgb_descriptor = rgb_descriptor.astype(np.float32)
         object_class = features['object_class'].bytes_list.value[0].decode("utf-8")
         data_id = features['data_id'].bytes_list.value[0].decode("utf-8")
         cad_index = features['cad_index'].bytes_list.value[0].decode("utf-8")
@@ -301,6 +250,7 @@ def magic_input_fn():
         img_string = example.features.feature['positive_depth_image'].bytes_list.value[0]
         img_1d = np.fromstring(img_string, dtype=np.uint8)
         pos_depth_image = img_1d.reshape((224, 224, 3))
+        pos_depth_image = pos_depth_image.astype(np.float32)
 
         print(f"RGB Descriptor: {rgb_descriptor}")
         print(f"RGB Descriptor Shape: {rgb_descriptor.shape}")
@@ -348,8 +298,9 @@ def magic_input_fn():
         print("Command: " + full_command)
         negative_depth_image = cv2.imread(depth_path, cv2.IMREAD_COLOR)
         negative_depth_image = cv2.cvtColor(negative_depth_image, cv2.COLOR_BGR2RGB)
+        negative_depth_image = negative_depth_image.astype(np.float32)
 
-        single_feature = (rgb_descriptor, pos_depth_image, negative_depth_image)
+        single_feature = np.array(rgb_descriptor, pos_depth_image, negative_depth_image)
         single_label = str(object_class)
 
         all_features.append(single_feature)
@@ -454,6 +405,9 @@ def magic_input_eval_fn():
     all_features = np.array(all_features)
     all_labels = np.array(all_labels)
 
+    print("Feature and Label Len: ")
+    print(len(all_features))
+    print(len(all_labels))
     dataset = tf.data.Dataset.from_tensor_slices((all_features, all_labels))
     dataset = dataset.shuffle(buffer_size=5000)
     dataset.apply(tf.contrib.data.ignore_errors())
