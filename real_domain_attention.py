@@ -8,8 +8,9 @@ import cv2
 import os
 import scipy.stats as st
 from scipy import ndimage
+
 from nets import nets_factory, resnet_v1
-from real_domain_cnn import pose_loss
+from real_domain_cnn import pose_loss, train_input_fn
 
 slim = tf.contrib.slim
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -52,6 +53,7 @@ def real_domain_attention_cnn_model_fn(features, labels, mode):
     features = tf.identity(features, name="input")  # Used when converting to unity
     is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
+    # with tf.variable_scope('base_resnet'):
     with slim.arg_scope(resnet_v1.resnet_arg_scope()):
         # Retrieve the function that returns logits and endpoints - ResNet was pre trained on ImageNet
         network_fn = nets_factory.get_network_fn(NETWORK_NAME, num_classes=None, is_training=is_training)
@@ -215,3 +217,24 @@ def perform_attention(attention_feature_map, feature_map, attention_nonlinear, k
             attention_feat = tf.expand_dims(tf.expand_dims(attention_feat, 1), 2)
 
     return attention_feat, attention_prob, attention_score
+
+
+@click.command()
+@click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/models/attention",
+              help='Path to model to evaluate')
+def main(model_dir):
+    # Create your own input function - https://www.tensorflow.org/guide/custom_estimators
+    # To handle all of our TF Records
+    global MODEL_DIR
+    MODEL_DIR = model_dir
+    with tf.device("/device:GPU:0"):
+        # Create the Estimator
+        real_domain_cnn = tf.estimator.Estimator(
+            model_fn=real_domain_attention_cnn_model_fn,
+            model_dir=model_dir
+        )
+
+        tensors_to_log = {"logits": "2d_predictions", "learning_rate": "learning_rate", }
+        logging_hook = tf.train.LoggingTensorHook(tensors=tensors_to_log, every_n_iter=100)
+
+        real_domain_cnn.train(input_fn=train_input_fn, hooks=[logging_hook])
