@@ -108,9 +108,9 @@ def real_domain_attention_cnn_model_fn(features, labels, mode):
 
     # create a pose_loss function so that we can get the loss
     print("Logits")
-    print(logits)
+    print(logits.shape)
     print("Labels")
-    print(labels)
+    print(labels.shape)
 
     loss = pose_loss(labels, logits)
 
