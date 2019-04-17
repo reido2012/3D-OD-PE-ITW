@@ -66,7 +66,7 @@ def real_domain_attention_cnn_model_fn(features, labels, mode):
     print("Feature Map Shape")
     print(feature_map.shape)
     with slim.arg_scope([slim.batch_norm], is_training=True):
-        _, attention_prob, _, end_points = attention_subnetwork(feature_map, end_points,
+        _, attention_prob, _, end_points, pure_att_feat = attention_subnetwork(feature_map, end_points,
                                                                 attention_type=
                                                                 _SUPPORTED_ATTENTION_TYPES[
                                                                     0],
@@ -76,24 +76,22 @@ def real_domain_attention_cnn_model_fn(features, labels, mode):
 
     print("Original Attention Shape")
     print(attention_prob.shape)
+
+    print("Pure ATt Feat")
+    print(pure_att_feat.shape)
+
     attention = tf.reshape(attention_prob, [-1])
     feature_map_att = tf.reshape(feature_map, [-1, 2048])
 
     # Use attention score to select feature vectors.
     indices = tf.reshape(tf.where(attention >= ABS_THRESH), [-1])
     selected_features = tf.gather(feature_map_att, indices)
-    selected_features_2 = tf.gather(feature_map, indices)
-
     print("Selected Features Shape")
-    print(selected_features.shape)
-
-    print("Selected Features 2 Shape")
-    selected_features_2 = tf.Print(selected_features_2, [selected_features])
-    print(selected_features_2.shape)
+    selected_features = tf.Print(selected_features, [selected_features])
     # Add a dense layer to get the 19 neuron linear output layer
-    logits = tf.layers.dense(selected_features_2, 19)
+    logits = tf.layers.dense(selected_features, 19)
     print("Logits Shape")
-    logits = tf.Print(logits, [logits])
+    logits = tf.Print(logits, [logits], "PLS, Jesus: ")
     logits = tf.squeeze(logits, name='2d_predictions')
 
     predictions = {
@@ -188,12 +186,12 @@ def attention_subnetwork(feature_map, end_points, attention_type=_SUPPORTED_ATTE
         end_points['attention_feature_map'] = attention_feature_map
 
         attention_outputs = perform_attention(attention_feature_map, feature_map, 'softplus', kernel)
-        prelogits, attention_prob, attention_score = attention_outputs
+        prelogits, attention_prob, attention_score, pure_att_feat = attention_outputs
         end_points['prelogits'] = prelogits
         end_points['attention_prob'] = attention_prob
         end_points['attention_score'] = attention_score
 
-    return prelogits, attention_prob, attention_score, end_points
+    return prelogits, attention_prob, attention_score, end_points, pure_att_feat
 
 
 def perform_attention(attention_feature_map, feature_map, attention_nonlinear, kernel=1):
@@ -232,11 +230,12 @@ def perform_attention(attention_feature_map, feature_map, attention_nonlinear, k
             if attention_nonlinear == 'softplus':
                 with tf.variable_scope('softplus_attention', values=[attention_feature_map, attention_score]):
                     attention_prob = tf.nn.softplus(attention_score)
+                    pure_attention_feat = attention_feature_map
                     attention_feat = tf.reduce_mean(tf.multiply(attention_feature_map, attention_prob), [1, 2])
 
             attention_feat = tf.expand_dims(tf.expand_dims(attention_feat, 1), 2)
 
-    return attention_feat, attention_prob, attention_score
+    return attention_feat, attention_prob, attention_score, pure_attention_feat
 
 
 @click.command()
