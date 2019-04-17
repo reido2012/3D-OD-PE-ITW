@@ -82,9 +82,9 @@ def real_domain_attention_cnn_model_fn(features, labels, mode):
     print(selected_features.shape)
     # Add a dense layer to get the 19 neuron linear output layer
     logits = tf.layers.dense(selected_features, 19)
+    print("Logits Shape")
+    print(logits.shape)
     logits = tf.squeeze(logits, name='2d_predictions')
-
-    logits = tf.reshape(logits, [None, 19])
 
     predictions = {
         # Generate predictions (for PREDICT and EVAL mode)
