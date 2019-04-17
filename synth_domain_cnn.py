@@ -21,7 +21,7 @@ REG_CONSTANT = 1e-3
 MODEL_DIR = ""
 PATH_TO_RD_META = ""
 STARTING_LR = 1e-4
-TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords_all_negs/"
+TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords/"
 TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR + "pascal_train.tfrecords",
                       TFRECORDS_DIR + "imagenet_val.tfrecords"]
 
