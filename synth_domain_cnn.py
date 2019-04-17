@@ -439,7 +439,7 @@ def magic_input_eval_fn():
         negative_depth_image = cv2.cvtColor(negative_depth_image, cv2.COLOR_BGR2RGB)
 
         single_feature = (rgb_descriptor, pos_depth_image, negative_depth_image)
-        single_label = object_class
+        single_label = str(object_class)
 
         all_features.append(single_feature)
         all_labels.append(single_label)
@@ -451,7 +451,8 @@ def magic_input_eval_fn():
     dataset = dataset.shuffle(buffer_size=5000)
     dataset.apply(tf.contrib.data.ignore_errors())
     dataset = dataset.batch(batch_size=BATCH_SIZE)
-
+    print("DS Ouput Shapes")
+    print(dataset.output_shapes)
     dataset = dataset.repeat(count=10)
     iterator = dataset.make_one_shot_iterator()
     features, labels = iterator.get_next()
