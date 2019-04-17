@@ -242,6 +242,7 @@ def magic_input_fn():
         features = example.features.feature
 
         rgb_descriptor = features['rgb_descriptor'].float_list.value
+        print(f"RGB Descriptor: {rgb_descriptor}")
         rgb_descriptor = rgb_descriptor.astype(np.float32)
         object_class = features['object_class'].bytes_list.value[0].decode("utf-8")
         data_id = features['data_id'].bytes_list.value[0].decode("utf-8")
@@ -252,7 +253,7 @@ def magic_input_fn():
         pos_depth_image = img_1d.reshape((224, 224, 3))
         pos_depth_image = pos_depth_image.astype(np.float32)
 
-        print(f"RGB Descriptor: {rgb_descriptor}")
+
         print(f"RGB Descriptor Shape: {rgb_descriptor.shape}")
 
         print(f"Object Class: {object_class}")
