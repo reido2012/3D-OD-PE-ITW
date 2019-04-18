@@ -46,7 +46,7 @@ def store_to_db(model_dir):
         rot_z = prediction["rot_z"].decode("utf-8")
         viewpoint = json.dumps((rot_x, rot_y, rot_z))
 
-        c.execute("INSERT INTO full_pose_space VALUES (?, ?, ?, ?, ?, ?, ?)",
+        c.execute("INSERT INTO full_pose_space VALUES (?, ?, ?, ?, ?)",
                   (viewpoint, image_path, object_class, cad_index, depth_emb))
 
     c.close()
