@@ -48,8 +48,8 @@ def store_to_db(model_dir):
 
         c.execute("INSERT INTO full_pose_space VALUES (?, ?, ?, ?, ?)",
                   (viewpoint, image_path, object_class, cad_index, depth_emb))
-
-    c.close()
+    conn.commit()
+    conn.close()
 
 
 def predict_input_fn(tfrecords_file):
