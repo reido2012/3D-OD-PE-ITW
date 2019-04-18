@@ -13,45 +13,11 @@ slim = tf.contrib.slim
 FULL_POSE_TFRECORD = "/home/omarreid/selerio/datasets/full_pose_space.tfrecords"
 
 
-def main(json_file_name, model_dir):
-    full_pose_space_db = dict({})
+def main(model_dir):
 
     with tf.device("/device:GPU:0"):
-
+        print(f"Model Dir: {model_dir}")
         store_to_db(model_dir)
-
-    #     synth_domain_cnn = tf.estimator.Estimator(
-    #         model_fn=synth_domain_cnn_model_fn_predict,
-    #         model_dir=model_dir
-    #     )
-    #
-    #     all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(FULL_POSE_TFRECORD),
-    #                                                      yield_single_examples=True)
-    #
-    #     for counter, prediction in enumerate(all_model_predictions):
-    #         depth_emb = tuple(prediction["depth_embeddings"].squeeze().astype(str))
-    #         cad_index = prediction["cad_index"].decode("utf-8")
-    #         object_class = prediction["object_class"].decode("utf-8")
-    #         image_path = prediction["image_path"].decode("utf-8")
-    #         rot_x = prediction["rot_x"].decode("utf-8")
-    #         rot_y = prediction["rot_y"].decode("utf-8")
-    #         rot_z = prediction["rot_z"].decode("utf-8")
-    #
-    #         descriptor_info = {
-    #             "cad_index": cad_index,
-    #             "object_class": object_class,
-    #             "depth_image_path": image_path
-    #         }
-    #
-    #         viewpoint = (rot_x, rot_y, rot_z)
-    #         viewpoint = str(viewpoint)
-    #         if viewpoint in full_pose_space_db:
-    #             full_pose_space_db[viewpoint][depth_emb] = descriptor_info
-    #         else:
-    #             full_pose_space_db[viewpoint] = {depth_emb: descriptor_info}
-    #
-    # with open(json_file_name + '.json', 'w') as fp:
-    #     json.dump(full_pose_space_db, fp, indent=4)
 
 
 def store_to_db(model_dir):
@@ -194,4 +160,4 @@ def convert_string_to_image(image_string, standardize=True):
 
 
 if __name__ == '__main__':
-    main("full_pose_descriptors", "/home/omarreid/selerio/final_year_project/synth_models/model_three")
+    main("/home/omarreid/selerio/final_year_project/synth_models/model_three")
