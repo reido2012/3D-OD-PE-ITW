@@ -160,4 +160,4 @@ def convert_string_to_image(image_string, standardize=True):
 
 
 if __name__ == '__main__':
-    main("/home/omarreid/selerio/final_year_project/synth_models/model_three")
+    main("/home/omarreid/selerio/final_year_project/synth_models/model_one")
