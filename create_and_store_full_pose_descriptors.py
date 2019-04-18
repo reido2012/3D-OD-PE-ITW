@@ -33,13 +33,11 @@ def store_to_db(model_dir):
     c.execute('''CREATE TABLE full_pose_space
                  (viewpoint text, image_path text, object_class text, cad_index text, depth_embedding text)''')
 
-
-
     all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(FULL_POSE_TFRECORD),
                                                      yield_single_examples=True)
 
     for counter, prediction in enumerate(all_model_predictions):
-        depth_emb = json.dumps(prediction["depth_embeddings"].squeeze().astype(str))
+        depth_emb = json.dumps(list(prediction["depth_embeddings"].squeeze().astype(str)))
         cad_index = prediction["cad_index"].decode("utf-8")
         object_class = prediction["object_class"].decode("utf-8")
         image_path = prediction["image_path"].decode("utf-8")
