@@ -55,10 +55,10 @@ def main(json_file_name, model_dir):
 
 
 def store_to_db(model_dir):
-    conn = sqlite3.connect('full_pose.db')
+    conn = sqlite3.connect('full_pose_2.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE full_pose_space
-                 (rot_x text, rot_y text, rot_z text, image_path text, object_class text, cad_index text, depth_embedding text)''')
+                 (viewpoint text, image_path text, object_class text, cad_index text, depth_embedding text)''')
 
     synth_domain_cnn = tf.estimator.Estimator(
         model_fn=synth_domain_cnn_model_fn_predict,
@@ -76,9 +76,10 @@ def store_to_db(model_dir):
         rot_x = prediction["rot_x"].decode("utf-8")
         rot_y = prediction["rot_y"].decode("utf-8")
         rot_z = prediction["rot_z"].decode("utf-8")
+        viewpoint = json.dumps((rot_x, rot_y, rot_z))
 
-        c.execute("INSERT INTO full_pose_space VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                  (rot_x, rot_y, rot_z, image_path, object_class, cad_index, depth_emb))
+        c.execute("INSERT INTO full_pose_space VALUES (?, ?, ?, ?, ?, ?, ?)",
+                  (viewpoint, image_path, object_class, cad_index, depth_emb))
 
     c.close()
 
