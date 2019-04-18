@@ -14,6 +14,8 @@ FULL_POSE_TFRECORD = "/home/omarreid/selerio/datasets/full_pose_space.tfrecords"
 
 
 def main(model_dir):
+    global MODEL_DIR
+    MODEL_DIR = model_dir
 
     with tf.device("/device:GPU:0"):
         print(f"Model Dir: {model_dir}")
@@ -21,15 +23,17 @@ def main(model_dir):
 
 
 def store_to_db(model_dir):
-    conn = sqlite3.connect('full_pose_2.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE full_pose_space
-                 (viewpoint text, image_path text, object_class text, cad_index text, depth_embedding text)''')
 
     synth_domain_cnn = tf.estimator.Estimator(
         model_fn=synth_domain_cnn_model_fn_predict,
         model_dir=model_dir
     )
+    conn = sqlite3.connect('full_pose_2.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE full_pose_space
+                 (viewpoint text, image_path text, object_class text, cad_index text, depth_embedding text)''')
+
+
 
     all_model_predictions = synth_domain_cnn.predict(input_fn=lambda: predict_input_fn(FULL_POSE_TFRECORD),
                                                      yield_single_examples=True)
