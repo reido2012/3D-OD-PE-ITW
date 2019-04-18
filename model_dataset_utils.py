@@ -35,6 +35,8 @@ def tfrecord_parser(serialized_example):
             'object_image': tf.FixedLenFeature([], tf.string),
             'output_vector': tf.FixedLenFeature([19], tf.float32),
             'data_id': tf.FixedLenFeature([], tf.string),
+            'object_class': tf.FixedLenFeature([], tf.string),
+            'cad_index': tf.FixedLenFeature([], tf.string),
             'object_index': tf.FixedLenFeature([], tf.int64),
         }
     )
@@ -64,6 +66,8 @@ def tfrecord_parser(serialized_example):
         "object_index": features['object_index'],
         "img": input_image,
         "normal_img": normal_img,
+        "cad_index": features['cad_index'],
+        "object_class": features['object_class'],
         "ground_truth_output": output_vector
     }
 

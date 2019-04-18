@@ -1,16 +1,15 @@
-# Imports
-import logging
+import matplotlib
+
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import math
 import tensorflow as tf
 import numpy as np
-import glob
 import click
-import cv2
-import os
 import json
-import scipy.stats as st
-from scipy import ndimage
-from eval_metrics import get_single_examples_from_batch, get_ground_truth_rotation_matrix, get_predicted_3d_pose
+import sqlite3
+import cv2
+from eval_metrics import get_single_examples_from_batch, get_ground_truth_rotation_matrix, predict_input_fn
 from sklearn.neighbors import KDTree
 from nets import nets_factory, resnet_v1
 
@@ -40,41 +39,18 @@ MODEL_DIR = ""
 
 @click.command()
 @click.option('--image_path', help='Path to image to retrieve model for')
-def main(image_path):
-
-    # Load and pre process image
-    # https: // github.com / guillaumegenthial / tf - estimator - basics / blob / master / predict.py
-    # https://guillaumegenthial.github.io/serving-tensorflow-estimator.html#exporting-the-estimator-as-a-tfsaved_model
-    # https://stackoverflow.com/questions/46098863/how-to-import-an-saved-tensorflow-model-train-using-tf-estimator-and-predict-on
-
-    rgb_embedding, rot_x, rot_y, rot_z = get_real_domain_predictions("/home/omarreid/selerio/final_year_project/models/diss_test_1")
-
-    full_pose_embeddings, embeddings_info = get_synth_embeddings_at_viewpoint(rot_x, rot_y, rot_z)
-
-    closest_embedding = match_embeddings(rgb_embedding, full_pose_embeddings, closest_neighbours=3)
-
-    closest_embedding_info = get_embedding_info(closest_embedding, embeddings_info)
-    depth_image_path = closest_embedding_info['depth_image_path']
-
-    print(f"CAD Index: {closest_embedding_info['cad_index']}")
-    print(f"Object Class: {closest_embedding_info['object_class']}")
-    print(f"Depth Image Path: {closest_embedding_info['depth_image_path']}")
+def main():
+    start_eval("/home/omarreid/selerio/final_year_project/models/diss_test_1")
 
 
-
-def get_top_1_accuracy():
-    pass
-
-def load_and_pre_process_image(image_path):
-    pass
-
-def get_real_domain_predictions(model_path):
+def start_eval(model_path, visualize=True):
     real_domain_cnn = tf.estimator.Estimator(
         model_fn=real_domain_cnn_model_fn_predict,
         model_dir=model_path
     )
 
-    real_domain_predictions = real_domain_cnn.predict(input_fn=lambda: real_domain_cnn_model_fn_predict(EVAL_TFRECORDS), yield_single_examples=False)
+    real_domain_predictions = real_domain_cnn.predict(input_fn=lambda: predict_input_fn(EVAL_TFRECORDS),
+                                                      yield_single_examples=False)
     # If yielding single examples uncomment the line below - do this if you have a tensor/batch error (slower)
     all_model_predictions = get_single_examples_from_batch(real_domain_predictions)
 
@@ -82,64 +58,82 @@ def get_real_domain_predictions(model_path):
     num_predictions = len(all_model_predictions)
 
     for counter, model_prediction in enumerate(all_model_predictions):
-        model_output = model_prediction["2d_prediction"]
+        if counter == 10:
+            visualize = False
+
+        # model_output = model_prediction["2d_prediction"]
         image = np.uint8(model_prediction["original_img"])
         data_id = model_prediction["data_id"].decode('utf-8')
         cad_index = model_prediction["cad_index"].decode('utf-8')
         object_class = model_prediction["object_class"].decode('utf-8')
         object_index = model_prediction["object_index"]
-        ground_truth_output = model_prediction["output_vector"]
+        # ground_truth_output = model_prediction["output_vector"]
         rgb_embedding = np.array(model_prediction["image_descriptor"])
 
         ground_truth_rotation_matrix, focal, viewpoint_obj = get_ground_truth_rotation_matrix(data_id, object_index)
         rot_x, rot_y, rot_z = mat2euler(ground_truth_rotation_matrix)[::-1]
 
-        full_pose_embeddings, embeddings_info = get_synth_embeddings_at_viewpoint(rot_x, rot_y, rot_z)
+        full_pose_embeddings, embeddings_info = get_synth_embeddings_at_viewpoint((rot_x, rot_y, rot_z))
+
+        print("Number of Embeddings")
+        print(len(full_pose_embeddings))
 
         closest_embedding = match_embeddings(rgb_embedding, full_pose_embeddings, closest_neighbours=3)
 
         closest_embedding_info = get_embedding_info(closest_embedding, embeddings_info)
         depth_image_path = closest_embedding_info['depth_image_path']
+        depth_image_path = depth_image_path.replace("/./", "/")
 
         print(f"Original CAD Index: {cad_index}")
         print(f"Original Object Class: {object_class}")
-        print("*"*40)
+        print("*" * 40)
         synth_cad_index = closest_embedding_info['cad_index']
         synth_obj_class = closest_embedding_info['object_class']
         print(f"CAD Index: {synth_cad_index}")
         print(f"Object Class: {synth_obj_class}")
         print(f"Depth Image Path: {depth_image_path}")
 
+        if visualize:
+            fig = plt.figure(figsize=(15, 15))
+            ax = plt.subplot(1, 2, 1)
+            ax2 = plt.subplot(1, 2, 2)
+
+            # Depth Image
+            depth_image = cv2.imread(depth_image_path, cv2.IMREAD_COLOR)
+            depth_image = cv2.cvtColor(depth_image, cv2.COLOR_BGR2RGB)
+
+            ax.imshow(image)
+            ax2.imshow(depth_image)
+
+            plt.savefig("./{}_eval.jpg".format(counter))
+
         if synth_cad_index == object_index and synth_obj_class == object_class:
             correct += 1
 
-    top_1_accuracy = correct/float(num_predictions)
+        return
+
+    top_1_accuracy = correct / float(num_predictions)
+
+    print(f"Top 1 Accuracy: {top_1_accuracy}")
 
 
-    # Predict Virtual Control Points
+def get_synth_embeddings_at_viewpoint(viewpoint):
+    db_path = "/home/omarreid/selerio/final_year_project/full_pose_2.db"
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
 
-    # Get rgb embedding
-    # TODO: squeeze embedding
+    view = (json.dumps(viewpoint),)
+    print("View Point")
+    print(view)
 
-    # Compute Rot Matrix from VC Points
+    cursor.execute('SELECT depth_embedding, image_path, object_class, cad_index FROM full_pose_space WHERE viewpoint=?',
+                   view)
 
-    # Convert Rot Matrix to Euler
+    all_info = cursor.fetchall()
 
-    # Round Euler Angles to Closest 30 degree interval
+    all_embeddings, embedding_info = reformat_info(all_info)
 
-    return "",  "", "", ""
-
-
-def get_synth_embeddings_at_viewpoint(rot_x, rot_y, rot_z):
-    # Load JSON or access sqlite3 db
-    # viewpoint = str(tuple(str(rot_x), str(rot_y), str(rot_z)))
-    # embedding_info = full_pose_space_db[viewpoint]
-    # full_pose_embeddings = embedding_info.keys() gives all embeddings
-
-    # TODO: Loop through all embeddings and convert to np array and set type to float
-    # all_embeddings = reformat_embeddings(full_pose_embeddings)
-    # return all embeddings, embedding_info
-    return ""
+    return all_embeddings, embedding_info
 
 
 def match_embeddings(rgb_embedding, full_pose_embeddings, closest_neighbours=3):
@@ -156,14 +150,19 @@ def get_embedding_info(embedding, embeddings_info):
     return embeddings_info[embedding]
 
 
-def reformat_embeddings(all_embeddings):
+def reformat_info(all_info):
     reformatted_embeddings = []
-    for embedding_string in all_embeddings:
-        embedding_string = json.loads(embedding_string)
+    embedding_info = {}
+    for depth_embedding, image_path, object_class, cad_index in all_info:
+        embedding_string = json.loads(depth_embedding)
         embedding = np.array(embedding_string, dtype=np.float)
         reformatted_embeddings.append(embedding)
 
-    return np.array(reformatted_embeddings)
+        emb_key = tuple(embedding_string.astype(str))
+        embedding_info[emb_key] = {"depth_image_path": image_path, "object_class": object_class,
+                                   "cad_index": cad_index}
+
+    return np.array(reformatted_embeddings), embedding_info
 
 
 def mat2euler(M, cy_thresh=None):
@@ -195,7 +194,6 @@ def real_domain_cnn_model_fn_predict(features, labels, mode):
     Real Domain CNN from 3D Object Detection and Pose Estimation paper
     """
 
-    # Training End to End - So weights start from scratch
     input_images = tf.identity(features['img'], name="input")  # Used when converting to unity
 
     with slim.arg_scope(resnet_v1.resnet_arg_scope()):

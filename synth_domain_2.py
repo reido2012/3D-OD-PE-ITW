@@ -23,10 +23,6 @@ TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords/"
 TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR + "pascal_train.tfrecords",
                       TFRECORDS_DIR + "imagenet_val.tfrecords"]
 
-record_iterator_train1 = tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "imagenet_train.tfrecords")
-record_iterator_train2 = tf.python_io.tf_record_iterator(path= TFRECORDS_DIR + "pascal_train.tfrecords")
-record_iterator_train3 = tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "imagenet_val.tfrecords")
-ALL_ITERATORS = chain(record_iterator_train1, record_iterator_train2, record_iterator_train3)
 EVAL_TFRECORDS = [TFRECORDS_DIR + "pascal_val.tfrecords"]
 EVAL_ITERATOR = tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "pascal_val.tfrecords")
 DATASET_DIR = osp.expanduser('/home/omarreid/selerio/datasets/PASCAL3D+_release1.1')
@@ -46,6 +42,9 @@ class SynthDomainCNN:
         self.rgb_descriptors = tf.placeholder(tf.float32, [None, 2048])
         self.learning_rate = learning_rate
         self.batch_size = batch_size
+        self.all_iterators = chain(tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "imagenet_train.tfrecords"),
+                                   tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "pascal_train.tfrecords"),
+                                   tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "imagenet_val.tfrecords"))
 
         # Initialize training dataset
         self.initialize_dataset()
@@ -129,8 +128,7 @@ class SynthDomainCNN:
         return single_feature, single_label
 
     def synth_dataset_generator(self):
-        iterator = ALL_ITERATORS
-        for string_record in iterator:
+        for string_record in self.all_iterators:
             single_feature, single_label = self.create_element(string_record)
             print("Single Feature")
             print(single_feature)
@@ -147,6 +145,7 @@ class SynthDomainCNN:
             output_types=((tf.float32, tf.float32, tf.float32), tf.string),
             output_shapes=((tf.TensorShape([None, 2048]), IMAGE_SHAPE, IMAGE_SHAPE), tf.TensorShape([]))
         )
+        print("Dataset Output Shapes")
         print(self.dataset.output_shapes)
         self.dataset = self.dataset.apply(tf.contrib.data.ignore_errors())
         self.dataset = self.dataset.batch(50)
@@ -186,10 +185,12 @@ class SynthDomainCNN:
             variables_to_restore = [v for v in variables_to_restore if
                                     'resnet_v1_50/' in v.name and 'real_domain/' not in v.name and 'synth_domain/' in v.name]
             tf.train.init_from_checkpoint(checkpoint_path,
-                                          {v.name.split(':')[0].replace('synth_domain/', '', 1): v.name.split(':')[0] for v
+                                          {v.name.split(':')[0].replace('synth_domain/', '', 1): v.name.split(':')[0]
+                                           for v
                                            in variables_to_restore})
 
-        self.loss = self.similarity_loss(self.rgb_descriptors, self.positive_depth_descriptors, self.negative_depth_descriptors)
+        self.loss = self.similarity_loss(self.rgb_descriptors, self.positive_depth_descriptors,
+                                         self.negative_depth_descriptors)
 
         learning_rate = tf.train.exponential_decay(
             learning_rate=self.learning_rate,
@@ -238,7 +239,8 @@ class SynthDomainCNN:
             (rgb_descriptor, pos_depth_image, negative_depth_image), _ = self.sess.run(self.dataset)
 
             # Run optimization operation for current mini-batch
-            fd = {self.positive_depth_images: pos_depth_image, self.negative_depth_images: negative_depth_image, self.rgb_descriptors: rgb_descriptor, self.learning_rt: self.learning_rate}
+            fd = {self.positive_depth_images: pos_depth_image, self.negative_depth_images: negative_depth_image,
+                  self.rgb_descriptors: rgb_descriptor, self.learning_rt: self.learning_rate}
             self.sess.run(self.optim, feed_dict=fd)
 
             # Save summary every 100 steps
@@ -257,11 +259,9 @@ class SynthDomainCNN:
 @click.option('--model_dir', default="/home/omarreid/selerio/final_year_project/synth_models/test_2",
               help='Path to model to evaluate')
 def main(model_dir):
-
     global MODEL_DIR
     MODEL_DIR = model_dir
     with tf.device("/device:GPU:0"):
-
         # Specify initial learning rate
         learning_rate = STARTING_LR
 
@@ -278,7 +278,6 @@ def main(model_dir):
                 config=tf.ConfigProto(allow_soft_placement=True),
                 save_summaries_steps=None,
                 save_checkpoint_steps=500) as sess:
-
             # Initialize model session
             model.set_session(sess)
 
