@@ -58,7 +58,7 @@ def start_eval(model_path, visualize=True):
     num_predictions = len(all_model_predictions)
 
     for counter, model_prediction in enumerate(all_model_predictions):
-        if counter == 10:
+        if counter == 5:
             visualize = False
 
         # model_output = model_prediction["2d_prediction"]
