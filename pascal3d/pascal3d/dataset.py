@@ -22,7 +22,6 @@ import scipy.io
 import scipy.misc
 import skimage.color
 import sklearn.model_selection
-import tqdm
 
 from tqdm import tqdm
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
