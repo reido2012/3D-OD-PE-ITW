@@ -53,9 +53,10 @@ def start_eval(model_path, visualize=True):
     )
 
     real_domain_predictions = real_domain_cnn.predict(input_fn=lambda: predict_input_fn(EVAL_TFRECORDS),
-                                                      yield_single_examples=False)
+                                                      yield_single_examples=True)
     # If yielding single examples uncomment the line below - do this if you have a tensor/batch error (slower)
-    all_model_predictions = get_single_examples_from_batch(real_domain_predictions)
+    # all_model_predictions = get_single_examples_from_batch(real_domain_predictions)
+    all_model_predictions = real_domain_predictions
 
     correct = 0
     num_predictions = len(all_model_predictions)
