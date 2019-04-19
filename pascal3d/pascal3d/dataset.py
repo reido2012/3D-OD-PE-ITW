@@ -906,7 +906,7 @@ class Pascal3DDataset(object):
 
         writer = tf.python_io.TFRecordWriter(record_name)
         skipped = []
-        for data_id in tqdm.tqdm(ids):
+        for data_id in tqdm(ids):
 
             data = self.get_data(0, data_id=data_id)
 
