@@ -42,6 +42,7 @@ MODEL_DIR = ""
 def main():
     global MODEL_DIR
     model_dir = "/home/omarreid/selerio/final_year_project/models/diss_test_1"
+    MODEL_DIR = model_dir
     start_eval(model_dir)
 
 
