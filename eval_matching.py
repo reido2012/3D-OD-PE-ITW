@@ -59,7 +59,7 @@ def start_eval(model_path, visualize=True):
     all_model_predictions = real_domain_predictions
 
     correct = 0
-    num_predictions = len(all_model_predictions)
+    num_predictions = len(list(ll_model_predictions))
 
     for counter, model_prediction in enumerate(all_model_predictions):
         if counter == 5:
