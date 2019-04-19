@@ -37,8 +37,8 @@ STARTING_LR = 0.0001
 MODEL_DIR = ""
 
 
-@click.command()
-@click.option('--image_path', help='Path to image to retrieve model for')
+# @click.command()
+# @click.option('--image_path', help='Path to image to retrieve model for')
 def main():
     start_eval("/home/omarreid/selerio/final_year_project/models/diss_test_1")
 
