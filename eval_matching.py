@@ -40,7 +40,9 @@ MODEL_DIR = ""
 # @click.command()
 # @click.option('--image_path', help='Path to image to retrieve model for')
 def main():
-    start_eval("/home/omarreid/selerio/final_year_project/models/diss_test_1")
+    global MODEL_DIR
+    model_dir = "/home/omarreid/selerio/final_year_project/models/diss_test_1"
+    start_eval(model_dir)
 
 
 def start_eval(model_path, visualize=True):
