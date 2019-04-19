@@ -41,6 +41,9 @@ def tfrecord_parser(serialized_example):
         }
     )
 
+    print("Features")
+    print(features)
+
     # Convert Scalar String to uint8
     input_image = tf.decode_raw(features['object_image'], tf.uint8)
     input_image = tf.to_float(input_image)
