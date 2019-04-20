@@ -18,7 +18,7 @@ def dataset_base(dataset, shuffle=True):
         dataset = dataset.shuffle(buffer_size=SHUFFLE_BUFFER_SIZE)
 
     dataset = dataset.map(map_func=tfrecord_parser, num_parallel_calls=NUM_CPU_CORES) #Parallelize data transformation
-    print("*" * 40)
+
     dataset.apply(tf.contrib.data.ignore_errors())
     dataset = dataset.batch(batch_size=BATCH_SIZE)
     return dataset.prefetch(buffer_size=PRE_FETCH_BUFFER_SIZE)
@@ -41,9 +41,6 @@ def tfrecord_parser(serialized_example):
             'object_index': tf.FixedLenFeature([], tf.int64),
         }
     )
-
-    print("Features")
-    print(features)
 
     # Convert Scalar String to uint8
     input_image = tf.decode_raw(features['object_image'], tf.uint8)
