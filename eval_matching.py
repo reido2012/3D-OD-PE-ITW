@@ -76,6 +76,8 @@ def start_eval(model_path, visualize=True):
         rgb_embedding = np.array(model_prediction["image_descriptor"])
         print("RGB Embedding")
         print(rgb_embedding)
+        print("RGB Embedding Shape")
+        print(rgb_embedding.shape)
 
         ground_truth_rotation_matrix, focal, viewpoint_obj = get_ground_truth_rotation_matrix(data_id, object_index)
         rot_x, rot_y, rot_z = rot_to_interval(ground_truth_rotation_matrix, 30)
