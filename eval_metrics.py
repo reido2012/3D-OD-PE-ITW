@@ -173,8 +173,6 @@ def get_single_examples_from_batch(all_model_predictions):
         number_in_batch = min(len(data_ids), len(object_indices), len(output_vectors), len(predictions_2d), len(original_images))
         
         if type(predictions_2d[0]) is not np.ndarray:
-            print("Output Batch")
-            print(output_batch)
             single_examples.append({
                 "data_id": data_ids[0],
                 "object_index": object_indices[0],
