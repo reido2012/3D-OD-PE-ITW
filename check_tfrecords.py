@@ -14,7 +14,7 @@ import tensorflow as tf
 TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords_all_negs/"
 RD_TFRECORDS_DIR = "/home/omarreid/selerio/datasets/real_domain_tfrecords/"
 # RECORD_TO_CHECK = TFRECORDS_DIR + "imagenet_train.tfrecords"
-RECORD_TO_CHECK = TFRECORDS_DIR + "pascal_val.tfrecords"
+RECORD_TO_CHECK = RD_TFRECORDS_DIR + "pascal_val.tfrecords"
 # OVERFIT_TEST_TFRECORDS = "/notebooks/selerio/overfit_check.tfrecords"
 # EVAL_TEST_TFRECORDS = "/home/omarreid/selerio/datasets/real_domain_tfrecords/imagenet_val.tfrecords"
 DATASET_DIR = osp.expanduser('/home/omarreid/selerio/datasets/PASCAL3D+_release1.1')
@@ -22,7 +22,7 @@ OBJ_DIR = DATASET_DIR + "/OBJ/"
 
 def main():
     reconstructed_records = []
-    record_iterator = tf.python_io.tf_record_iterator(path=RD_TFRECORDS_DIR)
+    record_iterator = tf.python_io.tf_record_iterator(path=RECORD_TO_CHECK)
 
     for string_record in record_iterator:
         example = tf.train.Example()
