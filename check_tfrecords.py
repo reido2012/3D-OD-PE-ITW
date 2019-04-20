@@ -12,6 +12,7 @@ import numpy as np
 import skimage.io as io
 import tensorflow as tf
 TFRECORDS_DIR = "/home/omarreid/selerio/datasets/synth_domain_tfrecords_all_negs/"
+RD_TFRECORDS_DIR = "/home/omarreid/selerio/datasets/real_domain_tfrecords/"
 # RECORD_TO_CHECK = TFRECORDS_DIR + "imagenet_train.tfrecords"
 RECORD_TO_CHECK = TFRECORDS_DIR + "pascal_val.tfrecords"
 # OVERFIT_TEST_TFRECORDS = "/notebooks/selerio/overfit_check.tfrecords"
@@ -21,13 +22,22 @@ OBJ_DIR = DATASET_DIR + "/OBJ/"
 
 def main():
     reconstructed_records = []
-    record_iterator = tf.python_io.tf_record_iterator(path=RECORD_TO_CHECK)
+    record_iterator = tf.python_io.tf_record_iterator(path=RD_TFRECORDS_DIR)
 
     for string_record in record_iterator:
         example = tf.train.Example()
         example.ParseFromString(string_record)
         features = example.features.feature
+        print("CAD Index")
+        print(features['cad_index'].bytes_list.value[0].decode("utf-8"))
 
+        print("Data ID")
+        print(features['data_id'].bytes_list.value[0].decode("utf-8"))
+
+        print("Object Class")
+        print(features['object_class'].bytes_list.value[0].decode("utf-8"))
+
+        return
         rgb_descriptor = features['rgb_descriptor'].float_list.value
         object_class = features['object_class'].bytes_list.value[0].decode("utf-8")
         data_id = features['data_id'].bytes_list.value[0].decode("utf-8")
