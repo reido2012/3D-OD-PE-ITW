@@ -76,7 +76,7 @@ def start_eval(model_path, visualize=True):
         rgb_embedding = np.array(model_prediction["image_descriptor"])
 
         ground_truth_rotation_matrix, focal, viewpoint_obj = get_ground_truth_rotation_matrix(data_id, object_index)
-        rot_x, rot_y, rot_z = mat2euler(ground_truth_rotation_matrix)[::-1]
+        rot_x, rot_y, rot_z = rot_to_interval(ground_truth_rotation_matrix, 30)
 
         full_pose_embeddings, embeddings_info = get_synth_embeddings_at_viewpoint((rot_x, rot_y, rot_z))
 
@@ -122,7 +122,8 @@ def start_eval(model_path, visualize=True):
     print(f"Top 1 Accuracy: {top_1_accuracy}")
 
 
-def convert_angles(rot_x, rot_y, rot_z, interval=30):
+def rot_to_interval(ground_truth_rotation_matrix, interval=30):
+    rot_x, rot_y, rot_z = mat2euler(ground_truth_rotation_matrix)[::-1]
     rot_x = degrees(rot_x)
     rot_y = degrees(rot_y)
     rot_z = degrees(rot_z)
