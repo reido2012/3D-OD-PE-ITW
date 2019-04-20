@@ -167,6 +167,7 @@ def get_single_examples_from_batch(all_model_predictions):
         cad_indices = output_batch['object_class']
         object_indices = output_batch['object_index']
         output_vectors = output_batch['output_vector']
+        image_descriptors = output_batch['image_descriptor']
         predictions_2d = output_batch['2d_prediction']
         # images = output_batch['img']
         original_images = output_batch['original_img']
@@ -178,6 +179,7 @@ def get_single_examples_from_batch(all_model_predictions):
                 "object_index": object_indices[0],
                 "cad_index": cad_indices[0],
                 "output_vector": output_vectors[0],
+                "image_descriptor": output_vectors[0],
                 "object_class": object_classes[0],
                 # "img": images[0],
                 "original_img": original_images[0], 
@@ -190,6 +192,7 @@ def get_single_examples_from_batch(all_model_predictions):
                     "object_index": object_indices[index],
                     "output_vector": output_vectors[index],
                     "object_class": object_classes[index],
+                    "image_descriptor": output_vectors[index],
                     # "img": images[index],
                     "cad_index": cad_indices[index],
                     "original_img": original_images[index], 
