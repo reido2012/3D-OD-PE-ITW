@@ -9,12 +9,14 @@ import click
 import json
 import sqlite3
 import cv2
-from eval_metrics import get_single_examples_from_batch, get_ground_truth_rotation_matrix, predict_input_fn
+from eval_metrics import get_single_examples_from_batch, get_ground_truth_rotation_matrix
+from model_dataset_utils import predict_input_fn
 from sklearn.neighbors import KDTree
 from nets import nets_factory, resnet_v1
+from tensorflow.python import debug as tf_debug
 
 slim = tf.contrib.slim
-tf.logging.set_verbosity(tf.logging.INFO)
+tf.logging.set_verbosity(tf.logging.WARN)
 
 TFRECORDS_DIR = "/home/omarreid/selerio/datasets/real_domain_tfrecords/"
 TRAINING_TFRECORDS = [TFRECORDS_DIR + "imagenet_train.tfrecords", TFRECORDS_DIR + "pascal_train.tfrecords",
@@ -47,13 +49,14 @@ def main():
 
 
 def start_eval(model_path, visualize=True):
+    hooks = [tf_debug.LocalCLIDebugHook()]
     real_domain_cnn = tf.estimator.Estimator(
         model_fn=real_domain_cnn_model_fn_predict,
         model_dir=model_path
     )
 
     real_domain_predictions = real_domain_cnn.predict(input_fn=lambda: predict_input_fn(EVAL_TFRECORDS),
-                                                      yield_single_examples=True)
+                                                      yield_single_examples=True, hooks=hooks)
     # If yielding single examples uncomment the line below - do this if you have a tensor/batch error (slower)
     # all_model_predictions = get_single_examples_from_batch(real_domain_predictions)
     all_model_predictions = real_domain_predictions
