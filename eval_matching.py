@@ -175,7 +175,7 @@ def match_embeddings(rgb_embedding, full_pose_embeddings, closest_neighbours=3):
     dist, ind = tree.query(rgb_embedding, k=closest_neighbours)
     print(f"Indices: {ind}")
     print(f"Distance: {dist}")
-    closest_index = ind[0]
+    closest_index = ind[0][0]
     return full_pose_embeddings[closest_index]
 
 
