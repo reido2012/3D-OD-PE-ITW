@@ -73,7 +73,7 @@ def start_eval(model_path, visualize=True):
         object_class = model_prediction["object_class"].decode('utf-8')
         object_index = model_prediction["object_index"]
         # ground_truth_output = model_prediction["output_vector"]
-        rgb_embedding = np.array(model_prediction["image_descriptor"])
+        rgb_embedding = np.array(model_prediction["image_descriptor"]).squeeze()
         print("RGB Embedding")
         print(rgb_embedding)
         print("RGB Embedding Shape")
