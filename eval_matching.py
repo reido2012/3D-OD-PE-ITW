@@ -114,9 +114,12 @@ def start_eval(model_path, visualize=True):
             ax.imshow(image)
             ax2.imshow(depth_image)
 
-            plt.savefig("./{}_eval.jpg".format(counter))
+            print("Saving Figure")
+
+            plt.savefig(f"./{counter}_matching_eval.jpg")
 
         if synth_cad_index == object_index and synth_obj_class == object_class:
+            print("Correct!")
             correct += 1
 
         return
