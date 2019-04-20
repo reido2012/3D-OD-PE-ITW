@@ -78,10 +78,6 @@ def start_eval(model_path, visualize=True):
         ground_truth_rotation_matrix, focal, viewpoint_obj = get_ground_truth_rotation_matrix(data_id, object_index)
         rot_x, rot_y, rot_z = mat2euler(ground_truth_rotation_matrix)[::-1]
 
-        rot_x = degrees(rot_x)
-        rot_y = degrees(rot_y)
-        rot_z = degrees(rot_z)
-
         full_pose_embeddings, embeddings_info = get_synth_embeddings_at_viewpoint((rot_x, rot_y, rot_z))
 
         print("Number of Embeddings")
@@ -126,6 +122,21 @@ def start_eval(model_path, visualize=True):
     print(f"Top 1 Accuracy: {top_1_accuracy}")
 
 
+def convert_angles(rot_x, rot_y, rot_z, interval=30):
+    rot_x = degrees(rot_x)
+    rot_y = degrees(rot_y)
+    rot_z = degrees(rot_z)
+    rot_x = get_closest_interval(rot_x, interval)
+    rot_y = get_closest_interval(rot_y, interval)
+    rot_z = get_closest_interval(rot_z, interval)
+
+    return rot_x, rot_y, rot_z
+
+
+def get_closest_interval(angle, interval):
+    return round(angle / float(interval)) * interval
+
+
 def get_synth_embeddings_at_viewpoint(viewpoint):
     db_path = "/home/omarreid/selerio/final_year_project/full_pose_2.db"
     conn = sqlite3.connect(db_path)
@@ -139,7 +150,8 @@ def get_synth_embeddings_at_viewpoint(viewpoint):
                    view)
 
     all_info = cursor.fetchall()
-
+    print("All Info")
+    print(all_info)
     all_embeddings, embedding_info = reformat_info(all_info)
 
     return all_embeddings, embedding_info
