@@ -180,9 +180,8 @@ def reformat_info(all_info):
         embedding_string = json.loads(depth_embedding)
         embedding = np.array(embedding_string, dtype=np.float)
         reformatted_embeddings.append(embedding)
-        print("Full Pose Embeddings To Float")
-        print(embedding)
-        emb_key = embedding_string
+
+        emb_key = tuple(embedding)
         embedding_info[emb_key] = {"depth_image_path": image_path, "object_class": object_class,
                                    "cad_index": cad_index}
 
