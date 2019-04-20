@@ -935,19 +935,17 @@ class Pascal3DDataset(object):
 
             # Create a TF Record for each object in record
             for counter, (cls, obj) in enumerate(objects):
-                # if obj['skip'] and record_name == 'pascal_val.tfrecords':
-                #     # We only want to evaluate on non truncated/occluded objects
-                #     # Skip object if it is truncated
-                #     skipped.append("Object: " + str(counter) + " In Image: " + str(data_id) + "\n")
-                #     continue
+                if obj['skip'] and record_name == 'pascal_val.tfrecords':
+                    # We only want to evaluate on non truncated/occluded objects
+                    # Skip object if it is truncated
+                    skipped.append("Object: " + str(counter) + " In Image: " + str(data_id) + "\n")
+                    continue
 
                 virtual_control_points_2d, bbox_3d_dims = self._get_real_domain_output_vector(
                     cls, class_cads, obj)
 
                 cad_index = obj['cad_index']
                 cad_index = self.get_cad_number(cad_index)
-                print(f"CAD INDEX: {cad_index}")
-                print(f"CAD INDEX TYPE: {type(cad_index)}")
 
                 bbox = obj['bbox']
 
