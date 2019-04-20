@@ -5,11 +5,10 @@ import matplotlib.pyplot as plt
 import math
 import tensorflow as tf
 import numpy as np
-import click
 import json
 import sqlite3
 import cv2
-from eval_metrics import, get_ground_truth_rotation_matrix
+from eval_metrics import get_ground_truth_rotation_matrix
 from model_dataset_utils import predict_input_fn
 from sklearn.neighbors import KDTree
 from nets import nets_factory, resnet_v1
