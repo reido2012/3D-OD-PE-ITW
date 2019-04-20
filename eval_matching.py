@@ -166,7 +166,7 @@ def match_embeddings(rgb_embedding, full_pose_embeddings, closest_neighbours=3):
     print(full_pose_embeddings.shape)
     tree = KDTree(full_pose_embeddings, leaf_size=40, metric="euclidean")
 
-    # rgb_embedding = rgb_embedding.reshape(1, -1)
+    rgb_embedding = rgb_embedding.reshape(1, -1)
     print("RGB Embedding")
     print(rgb_embedding)
 
