@@ -317,6 +317,7 @@ def real_domain_cnn_model_fn_predict(features, labels, mode):
         # Generate predictions (for PREDICT and EVAL mode)
         "2d_prediction": logits,
         "data_id":features['data_id'],
+        "image_descriptor": image_descriptors,
         "object_index": features['object_index'],
         "output_vector": features['ground_truth_output'],
         "object_class": features['object_class'],
