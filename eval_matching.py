@@ -74,6 +74,8 @@ def start_eval(model_path, visualize=True):
         object_index = model_prediction["object_index"]
         # ground_truth_output = model_prediction["output_vector"]
         rgb_embedding = np.array(model_prediction["image_descriptor"])
+        print("RGB Embedding")
+        print(rgb_embedding)
 
         ground_truth_rotation_matrix, focal, viewpoint_obj = get_ground_truth_rotation_matrix(data_id, object_index)
         rot_x, rot_y, rot_z = rot_to_interval(ground_truth_rotation_matrix, 30)
@@ -127,6 +129,7 @@ def rot_to_interval(ground_truth_rotation_matrix, interval=30):
     rot_x = degrees(rot_x)
     rot_y = degrees(rot_y)
     rot_z = degrees(rot_z)
+
     rot_x = get_closest_interval(rot_x, interval)
     rot_y = get_closest_interval(rot_y, interval)
     rot_z = get_closest_interval(rot_z, interval)
@@ -151,8 +154,6 @@ def get_synth_embeddings_at_viewpoint(viewpoint):
                    view)
 
     all_info = cursor.fetchall()
-    print("All Info")
-    print(all_info)
     all_embeddings, embedding_info = reformat_info(all_info)
 
     return all_embeddings, embedding_info
@@ -179,8 +180,9 @@ def reformat_info(all_info):
         embedding_string = json.loads(depth_embedding)
         embedding = np.array(embedding_string, dtype=np.float)
         reformatted_embeddings.append(embedding)
-
-        emb_key = tuple(embedding_string.astype(str))
+        print("Full Pose Embeddings To Float")
+        print(embedding)
+        emb_key = embedding_string
         embedding_info[emb_key] = {"depth_image_path": image_path, "object_class": object_class,
                                    "cad_index": cad_index}
 
