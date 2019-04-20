@@ -12,7 +12,6 @@ from eval_metrics import get_ground_truth_rotation_matrix
 from model_dataset_utils import predict_input_fn
 from sklearn.neighbors import KDTree
 from nets import nets_factory, resnet_v1
-from tensorflow.python import debug as tf_debug
 
 slim = tf.contrib.slim
 tf.logging.set_verbosity(tf.logging.WARN)
@@ -48,14 +47,13 @@ def main():
 
 
 def start_eval(model_path, visualize=True):
-    hooks = [tf_debug.LocalCLIDebugHook()]
     real_domain_cnn = tf.estimator.Estimator(
         model_fn=real_domain_cnn_model_fn_predict,
         model_dir=model_path
     )
 
     real_domain_predictions = real_domain_cnn.predict(input_fn=lambda: predict_input_fn(EVAL_TFRECORDS),
-                                                      yield_single_examples=True, hooks=hooks)
+                                                      yield_single_examples=True)
     # If yielding single examples uncomment the line below - do this if you have a tensor/batch error (slower)
     # all_model_predictions = get_single_examples_from_batch(real_domain_predictions)
     all_model_predictions = real_domain_predictions
