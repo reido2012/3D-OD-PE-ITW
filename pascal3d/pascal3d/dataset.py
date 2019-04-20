@@ -944,7 +944,8 @@ class Pascal3DDataset(object):
                 virtual_control_points_2d, bbox_3d_dims = self._get_real_domain_output_vector(
                     cls, class_cads, obj)
 
-                cad_index = str(obj['cad_index'])
+                cad_index = obj['cad_index']
+                cad_index = self.get_cad_number(cad_index)
 
                 bbox = obj['bbox']
 
