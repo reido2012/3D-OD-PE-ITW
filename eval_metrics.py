@@ -163,8 +163,8 @@ def get_single_examples_from_batch(all_model_predictions):
     single_examples = []
     for output_batch in all_model_predictions:
         data_ids = output_batch['data_id']
-        object_classes = output_batch['cad_index']
-        cad_indices = output_batch['object_class']
+        object_classes = output_batch['object_class']
+        cad_indices = output_batch['cad_index']
         object_indices = output_batch['object_index']
         output_vectors = output_batch['output_vector']
         image_descriptors = output_batch['image_descriptor']

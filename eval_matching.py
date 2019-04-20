@@ -65,6 +65,7 @@ def start_eval(model_path, visualize=True):
     for counter, model_prediction in enumerate(all_model_predictions):
         if counter >= 5:
             visualize = False
+            break
 
         # model_output = model_prediction["2d_prediction"]
         image = np.uint8(model_prediction["original_img"])
@@ -122,7 +123,7 @@ def start_eval(model_path, visualize=True):
             print("Correct!")
             correct += 1
 
-        return
+
 
     top_1_accuracy = correct / float(num_predictions)
 
