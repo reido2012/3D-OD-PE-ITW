@@ -160,11 +160,16 @@ def get_synth_embeddings_at_viewpoint(viewpoint):
 
 
 def match_embeddings(rgb_embedding, full_pose_embeddings, closest_neighbours=3):
-    rgb_embedding = rgb_embedding.reshape(1, -1)
+    print("Full Pose Space Shape")
+    print(full_pose_embeddings.shape)
+    tree = KDTree(full_pose_embeddings, leaf_size=40, metric="euclidean")
+
+    # rgb_embedding = rgb_embedding.reshape(1, -1)
     print("RGB Embedding")
     print(rgb_embedding)
 
-    tree = KDTree(full_pose_embeddings, leaf_size=40, metric="euclidean")
+    print("RGB Embedding Shape")
+    print(rgb_embedding.shape)
     dist, ind = tree.query(rgb_embedding, k=closest_neighbours)
     print(f"Indices: {ind}")
     print(f"Distance: {dist}")
