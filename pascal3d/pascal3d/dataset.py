@@ -946,7 +946,7 @@ class Pascal3DDataset(object):
 
                 cad_index = obj['cad_index']
                 cad_index = self.get_cad_number(cad_index)
-                print(f"CAD INDEX: {cad_index}")
+                # print(f"CAD INDEX: {cad_index}")
 
                 bbox = obj['bbox']
 
