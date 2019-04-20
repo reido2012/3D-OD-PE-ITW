@@ -44,7 +44,7 @@ def main():
     global MODEL_DIR
     model_dir = "/home/omarreid/selerio/final_year_project/models/diss_test_1"
     MODEL_DIR = model_dir
-    start_eval(model_dir)
+    start_eval(model_dir, True)
 
 
 def start_eval(model_path, visualize=True):
@@ -63,7 +63,7 @@ def start_eval(model_path, visualize=True):
     num_predictions = len(list(all_model_predictions))
 
     for counter, model_prediction in enumerate(all_model_predictions):
-        if counter == 5:
+        if counter >= 5:
             visualize = False
 
         # model_output = model_prediction["2d_prediction"]
@@ -183,7 +183,7 @@ def match_embeddings(rgb_embedding, full_pose_embeddings, closest_neighbours=3):
 
 
 def get_embedding_info(embedding, embeddings_info):
-    embedding = tuple(embedding.astype(str))
+    embedding = tuple(embedding)
     return embeddings_info[embedding]
 
 
