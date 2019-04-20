@@ -12,6 +12,7 @@ from eval_metrics import get_ground_truth_rotation_matrix, get_single_examples_f
 from model_dataset_utils import predict_input_fn
 from sklearn.neighbors import KDTree
 from nets import nets_factory, resnet_v1
+from math import degrees
 
 slim = tf.contrib.slim
 tf.logging.set_verbosity(tf.logging.WARN)
@@ -76,6 +77,10 @@ def start_eval(model_path, visualize=True):
 
         ground_truth_rotation_matrix, focal, viewpoint_obj = get_ground_truth_rotation_matrix(data_id, object_index)
         rot_x, rot_y, rot_z = mat2euler(ground_truth_rotation_matrix)[::-1]
+
+        rot_x = degrees(rot_x)
+        rot_y = degrees(rot_y)
+        rot_z = degrees(rot_z)
 
         full_pose_embeddings, embeddings_info = get_synth_embeddings_at_viewpoint((rot_x, rot_y, rot_z))
 
