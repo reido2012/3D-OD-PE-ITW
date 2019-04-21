@@ -123,8 +123,6 @@ def start_eval(model_path, visualize=True):
             print("Correct!")
             correct += 1
 
-
-
     top_1_accuracy = correct / float(num_predictions)
 
     print(f"Top 1 Accuracy: {top_1_accuracy}")
@@ -136,14 +134,19 @@ def rot_to_interval(ground_truth_rotation_matrix, interval=30):
     rot_y = degrees(rot_y)
     rot_z = degrees(rot_z)
 
-    rot_x = get_closest_interval(rot_x, interval)
+    rot_x = get_closest_interval(rot_x, interval, non_negative=False)
+
     rot_y = get_closest_interval(rot_y, interval)
     rot_z = get_closest_interval(rot_z, interval)
 
     return str(rot_x), str(rot_y), str(rot_z)
 
 
-def get_closest_interval(angle, interval):
+def get_closest_interval(angle, interval, non_negative=True):
+    if non_negative and angle < 0:
+        # the y and z values range from 0 to 360 unlike
+        angle = 360 + angle
+
     return round(angle / float(interval)) * interval
 
 
