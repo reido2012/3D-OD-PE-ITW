@@ -63,6 +63,7 @@ def start_eval(model_path, visualize=True):
     num_predictions = len(list(all_model_predictions))
 
     for counter, model_prediction in enumerate(all_model_predictions):
+        print("*"*40)
         if counter >= 5:
             visualize = False
             break
@@ -75,18 +76,11 @@ def start_eval(model_path, visualize=True):
         object_index = model_prediction["object_index"]
         # ground_truth_output = model_prediction["output_vector"]
         rgb_embedding = np.array(model_prediction["image_descriptor"]).squeeze()
-        print("RGB Embedding")
-        print(rgb_embedding)
-        print("RGB Embedding Shape")
-        print(rgb_embedding.shape)
 
         ground_truth_rotation_matrix, focal, viewpoint_obj = get_ground_truth_rotation_matrix(data_id, object_index)
         rot_x, rot_y, rot_z = rot_to_interval(ground_truth_rotation_matrix, 30)
 
         full_pose_embeddings, embeddings_info = get_synth_embeddings_at_viewpoint((rot_x, rot_y, rot_z))
-
-        print("Number of Embeddings")
-        print(len(full_pose_embeddings))
 
         closest_embedding = match_embeddings(rgb_embedding, full_pose_embeddings, closest_neighbours=3)
 
@@ -165,8 +159,7 @@ def get_synth_embeddings_at_viewpoint(viewpoint):
     cursor = conn.cursor()
 
     view = (json.dumps(viewpoint),)
-    print("View Point")
-    print(view)
+    print(f"Query View Point: {view}")
 
     cursor.execute('SELECT depth_embedding, image_path, object_class, cad_index FROM full_pose_space WHERE viewpoint=?',
                    view)
@@ -178,20 +171,12 @@ def get_synth_embeddings_at_viewpoint(viewpoint):
 
 
 def match_embeddings(rgb_embedding, full_pose_embeddings, closest_neighbours=3):
-    print("Full Pose Space Shape")
-    print(full_pose_embeddings.shape)
     tree = KDTree(full_pose_embeddings, leaf_size=40, metric="euclidean")
-
     rgb_embedding = rgb_embedding.reshape(1, -1)
-    print("RGB Embedding")
-    print(rgb_embedding)
-
-    print("RGB Embedding Shape")
-    print(rgb_embedding.shape)
     dist, ind = tree.query(rgb_embedding, k=closest_neighbours)
-    print(f"Indices: {ind}")
-    print(f"Distance: {dist}")
+
     closest_index = ind[0][0]
+
     return full_pose_embeddings[closest_index]
 
 
