@@ -139,6 +139,7 @@ def rot_to_interval(ground_truth_rotation_matrix, interval=30):
     print(f"Rot Z: {rot_z}")
 
     rot_x = get_closest_interval(rot_x, interval, check_non_negative=False)
+    rot_x = rot_x + 90
     rot_y = get_closest_interval(rot_y, interval)
     rot_z = get_closest_interval(rot_z, interval)
 
