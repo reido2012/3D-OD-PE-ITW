@@ -60,13 +60,13 @@ def start_eval(model_path, visualize=True):
     # all_model_predictions = real_domain_predictions
 
     correct = 0
+    correct_class = 0
     num_predictions = len(list(all_model_predictions))
 
     for counter, model_prediction in enumerate(all_model_predictions):
-        print("*"*40)
+        # print("*"*40)
         if counter >= 5:
             visualize = False
-            break
 
         # model_output = model_prediction["2d_prediction"]
         image = np.uint8(model_prediction["original_img"])
@@ -89,14 +89,14 @@ def start_eval(model_path, visualize=True):
         depth_image_path = closest_embedding_info['depth_image_path']
         depth_image_path = depth_image_path.replace("/./", "/")
 
-        print(f"Original CAD Index: {cad_index}")
-        print(f"Original Object Class: {object_class}")
-        print("*" * 40)
+        # print(f"Original CAD Index: {cad_index}")
+        # print(f"Original Object Class: {object_class}")
+        # print("*" * 40)
         synth_cad_index = closest_embedding_info['cad_index']
         synth_obj_class = closest_embedding_info['object_class']
-        print(f"CAD Index: {synth_cad_index}")
-        print(f"Object Class: {synth_obj_class}")
-        print(f"Depth Image Path: {depth_image_path}")
+        # print(f"CAD Index: {synth_cad_index}")
+        # print(f"Object Class: {synth_obj_class}")
+        # print(f"Depth Image Path: {depth_image_path}")
 
         if visualize:
             fig = plt.figure(figsize=(15, 15))
@@ -110,17 +110,20 @@ def start_eval(model_path, visualize=True):
             ax.imshow(image)
             ax2.imshow(depth_image)
 
-            print("Saving Figure")
-
             plt.savefig(f"./{counter}_matching_eval.jpg")
 
         if synth_cad_index == cad_index and synth_obj_class == object_class:
             print("Correct!")
             correct += 1
 
+        if synth_obj_class == object_class:
+            correct_class += 1
+
     top_1_accuracy = correct / float(num_predictions)
+    top_class_acc = correct_class / float(num_predictions)
 
     print(f"Top 1 Accuracy: {top_1_accuracy}")
+    print(f"Class Prediction Accuracy: {top_class_acc}")
 
 
 def rot_to_interval(ground_truth_rotation_matrix, interval=30):
@@ -128,10 +131,10 @@ def rot_to_interval(ground_truth_rotation_matrix, interval=30):
     rot_x = degrees(rot_x)
     rot_y = degrees(rot_y)
     rot_z = degrees(rot_z)
-    print("Original Rotation")
-    print(f"Rot X: {rot_x}")
-    print(f"Rot Y: {rot_y}")
-    print(f"Rot Z: {rot_z}")
+    # print("Original Rotation")
+    # print(f"Rot X: {rot_x}")
+    # print(f"Rot Y: {rot_y}")
+    # print(f"Rot Z: {rot_z}")
 
     rot_x = get_closest_interval(rot_x, interval, check_non_negative=False)
     rot_x = rot_x + 90
