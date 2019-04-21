@@ -72,7 +72,6 @@ def start_eval(model_path, visualize=True):
         image = np.uint8(model_prediction["original_img"])
         data_id = model_prediction["data_id"].decode('utf-8')
         cad_index = model_prediction["cad_index"].decode('utf-8')
-        rgb_cad_index_new = int(cad_index) - 1
 
         object_class = model_prediction["object_class"].decode('utf-8')
         object_index = model_prediction["object_index"]
@@ -90,7 +89,7 @@ def start_eval(model_path, visualize=True):
         depth_image_path = closest_embedding_info['depth_image_path']
         depth_image_path = depth_image_path.replace("/./", "/")
 
-        print(f"Original CAD Index: {rgb_cad_index_new}")
+        print(f"Original CAD Index: {cad_index}")
         print(f"Original Object Class: {object_class}")
         print("*" * 40)
         synth_cad_index = closest_embedding_info['cad_index']
@@ -115,7 +114,7 @@ def start_eval(model_path, visualize=True):
 
             plt.savefig(f"./{counter}_matching_eval.jpg")
 
-        if int(synth_cad_index) == rgb_cad_index_new and synth_obj_class == object_class:
+        if synth_cad_index == cad_index and synth_obj_class == object_class:
             print("Correct!")
             correct += 1
 
