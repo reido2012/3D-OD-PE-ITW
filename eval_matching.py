@@ -150,7 +150,12 @@ def get_closest_interval(angle, interval, check_non_negative=True):
         # the y and z values range from 0 to 360 unlike
         angle = 360 + angle
 
-    return round(angle / float(interval)) * interval
+    new_angle = round(angle / float(interval)) * interval
+
+    if new_angle == 360:
+        new_angle = 0
+
+    return new_angle
 
 
 def get_synth_embeddings_at_viewpoint(viewpoint):
