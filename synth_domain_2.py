@@ -236,8 +236,7 @@ class SynthDomainCNN:
             step = tf.train.global_step(self.sess, self.global_step)
 
             # Retrieve batch from data loader
-            print(self.dataset.get_next())
-            (rgb_descriptor, pos_depth_image, negative_depth_image), _ = self.dataset
+            (rgb_descriptor, pos_depth_image, negative_depth_image), _ = self.sess.run(self.dataset)
 
             # Run optimization operation for current mini-batch
             fd = {self.positive_depth_images: pos_depth_image, self.negative_depth_images: negative_depth_image,
