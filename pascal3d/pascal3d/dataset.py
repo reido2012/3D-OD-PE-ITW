@@ -44,7 +44,7 @@ BATCH_SIZE = 50
 SHUFFLE_BUFFER_SIZE = 18000
 NUM_CPU_CORES = 8
 PRE_FETCH_BUFFER_SIZE = 4
-IMAGE_SIZE = 224 # To match ResNet dimensions
+IMAGE_SIZE = 224  # To match ResNet dimensions
 GREYSCALE_SIZE = tf.constant(50176)
 GREYSCALE_CHANNEL = tf.constant(1)
 
@@ -755,8 +755,8 @@ class Pascal3DDataset(object):
                 bbox = obj['bbox']
                 obj_id = str(obj_idx)
 
-                cropped_img, square_bbox = self._crop_object_from_img(img, bbox)
-                resized_img = scipy.misc.imresize(cropped_img, (224, 224))
+                # cropped_img, square_bbox = self._crop_object_from_img(img, bbox)
+                # resized_img = scipy.misc.imresize(cropped_img, (224, 224))
                 _, bbox_3d_dims = self._get_real_domain_output_vector(cls, data['class_cads'], obj)
 
                 R, R_rot = utils.get_transformation_matrix(
@@ -769,13 +769,13 @@ class Pascal3DDataset(object):
                 cad_index = self.get_cad_number(cad_index)
 
                 positive_depth_map_image_path, negative_depth_paths = self.render_for_dataset(cls, cad_index,
-                                                                                             rotation_tuple,
-                                                                                             bbox_3d_dims, data_id,
-                                                                                             obj_id, OBJ_DIR,
-                                                                                             local=local)
+                                                                                              rotation_tuple,
+                                                                                              bbox_3d_dims, data_id,
+                                                                                              obj_id, OBJ_DIR,
+                                                                                              local=local)
 
-                positive_depth_image = scipy.misc.imread(positive_depth_map_image_path, mode='RGB')
-                positive_depth_image = scipy.misc.imresize(positive_depth_image, (224, 224, 3))
+                # positive_depth_image = scipy.misc.imread(positive_depth_map_image_path, mode='RGB')
+                # positive_depth_image = scipy.misc.imresize(positive_depth_image, (224, 224, 3))
 
                 # num_neg_depth_imgs = len(negative_depth_paths)
                 # raw_negative_depth_images = []
@@ -787,30 +787,23 @@ class Pascal3DDataset(object):
 
                 rgb_descriptor = descriptor_dict[(data_id, obj_idx)].squeeze().astype(np.float)
 
-                self._write_synth_record(writer, resized_img, rgb_descriptor, positive_depth_image, cad_index, cls,
-                                         data_id, obj_id)
+                self._write_synth_record(writer, rgb_descriptor, positive_depth_map_image_path, cad_index, cls,
+                                         data_id, obj_id, negative_depth_paths)
         writer.close()
 
-    def _write_synth_record(self, record_writer, image, rgb_descriptor, positive_depth_map_image, cad_index,
-                            object_class, data_id, object_index): #, raw_negative_depth_images,  num_neg_depth_imgs):
+    def _write_synth_record(self, record_writer, rgb_descriptor, positive_depth_map_path, cad_index,
+                            object_class, data_id, object_index, neg_depth_paths):
 
-        depth_img_raw = positive_depth_map_image.tostring()
-        img_raw = image.tostring()
 
         feature = {
-            'object_image': self._bytes_feature(img_raw),
-            'positive_depth_image': self._bytes_feature(depth_img_raw),
-            #'num_negative_depth_images': self._int64_feature(num_neg_depth_imgs),
+            'positive_depth_image_path': self._bytes_feature(positive_depth_map_path.encode('utf-8')),
             'rgb_descriptor': self._floats_feature(rgb_descriptor),
+            'neg_depth_paths': self._bytes_list_feature(neg_depth_paths),
             'object_class': self._bytes_feature(object_class.encode('utf-8')),
             'object_index': self._bytes_feature(object_index.encode('utf-8')),
             'data_id': self._bytes_feature(data_id.encode('utf-8')),
             'cad_index': self._bytes_feature(cad_index.encode('utf-8')),
         }
-
-        # for idx, neg_depth_img in enumerate(raw_negative_depth_images):
-        #     base_key = "neg/depth/img/" + str(idx)
-        #     feature[base_key] = self._bytes_feature(neg_depth_img)
 
         example = tf.train.Example(features=tf.train.Features(feature=feature))
         record_writer.write(example.SerializeToString())

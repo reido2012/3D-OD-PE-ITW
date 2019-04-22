@@ -42,9 +42,9 @@ class SynthDomainCNN:
         self.rgb_descriptors = tf.placeholder(tf.float32, [None, 2048])
         self.learning_rate = learning_rate
         self.batch_size = batch_size
-        self.all_iterators = chain(tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "imagenet_train.tfrecords"),
+        self.all_iterators = list(chain(tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "imagenet_train.tfrecords"),
                                    tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "pascal_train.tfrecords"),
-                                   tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "imagenet_val.tfrecords"))
+                                   tf.python_io.tf_record_iterator(path=TFRECORDS_DIR + "imagenet_val.tfrecords")))
 
         # Initialize training dataset
         self.initialize_dataset()
