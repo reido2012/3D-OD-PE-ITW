@@ -230,7 +230,7 @@ class SynthDomainCNN:
         # Iterate through 20000 training steps
         while not self.sess.should_stop():
 
-            # Update globale step
+            # Update global step
             step = tf.train.global_step(self.sess, self.global_step)
 
             # Retrieve batch from data loader

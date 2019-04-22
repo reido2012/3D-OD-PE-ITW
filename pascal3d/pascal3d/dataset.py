@@ -794,6 +794,7 @@ class Pascal3DDataset(object):
     def _write_synth_record(self, record_writer, rgb_descriptor, positive_depth_map_path, cad_index,
                             object_class, data_id, object_index, neg_depth_paths):
 
+        neg_depth_paths = list(map(lambda x: x.encode('utf-8'), neg_depth_paths))
 
         feature = {
             'positive_depth_image_path': self._bytes_feature(positive_depth_map_path.encode('utf-8')),
