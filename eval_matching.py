@@ -65,12 +65,12 @@ def start_eval(model_path, visualize=True):
 
     for counter, model_prediction in enumerate(all_model_predictions):
         # print("*"*40)
-        if counter < 100:
+        if counter < 200:
             continue
 
         visualize = True
 
-        if counter == 110:
+        if counter == 210:
             break
 
         # model_output = model_prediction["2d_prediction"]
@@ -106,12 +106,13 @@ def start_eval(model_path, visualize=True):
         if visualize:
             fig = plt.figure(figsize=(15, 15))
 
-            plt.axis('off')
-            plt.tick_params(axis='both', left='off', top='off', right='off', bottom='off', labelleft='off',
-                            labeltop='off', labelright='off', labelbottom='off')
-
             ax = plt.subplot(1, 2, 1)
+            ax.set_xticks([])
+            ax.set_yticks([])
+
             ax2 = plt.subplot(1, 2, 2)
+            ax2.set_xticks([])
+            ax2.set_yticks([])
             # Depth Image
             depth_image = cv2.imread(depth_image_path, cv2.IMREAD_COLOR)
             depth_image = cv2.cvtColor(depth_image, cv2.COLOR_BGR2RGB)
