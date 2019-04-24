@@ -65,8 +65,13 @@ def start_eval(model_path, visualize=True):
 
     for counter, model_prediction in enumerate(all_model_predictions):
         # print("*"*40)
-        if counter >= 5:
-            visualize = False
+        if counter < 100:
+            continue
+
+        visualize = True
+
+        if counter == 106:
+            break
 
         # model_output = model_prediction["2d_prediction"]
         image = np.uint8(model_prediction["original_img"])
