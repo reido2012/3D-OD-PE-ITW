@@ -70,7 +70,7 @@ def start_eval(model_path, visualize=True):
 
         visualize = True
 
-        if counter == 106:
+        if counter == 110:
             break
 
         # model_output = model_prediction["2d_prediction"]
