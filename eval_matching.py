@@ -105,15 +105,20 @@ def start_eval(model_path, visualize=True):
 
         if visualize:
             fig = plt.figure(figsize=(15, 15))
+
+            plt.axis('off')
+            plt.tick_params(axis='both', left='off', top='off', right='off', bottom='off', labelleft='off',
+                            labeltop='off', labelright='off', labelbottom='off')
+
             ax = plt.subplot(1, 2, 1)
             ax2 = plt.subplot(1, 2, 2)
-
             # Depth Image
             depth_image = cv2.imread(depth_image_path, cv2.IMREAD_COLOR)
             depth_image = cv2.cvtColor(depth_image, cv2.COLOR_BGR2RGB)
 
             ax.imshow(image)
             ax2.imshow(depth_image)
+
 
             plt.savefig(f"./{counter}_matching_eval.jpg")
 
