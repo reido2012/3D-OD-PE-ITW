@@ -71,12 +71,18 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
         all_model_predictions = real_domain_cnn.predict(input_fn=lambda : predict_input_fn(tfrecords_file), yield_single_examples=False)
         #If yielding single examples uncomment the line below - do this if you have a tensor/batch error (slower)
         all_model_predictions = get_single_examples_from_batch(all_model_predictions)
-        
+        f= open("accs.txt","w+")        
         for counter, model_prediction in enumerate(all_model_predictions):
+            if counter < 1070:
+                continue
+
+            if counter == 1090:
+                break
+            generate_imgs = True
             model_output = model_prediction["2d_prediction"]
             image = np.uint8(model_prediction["original_img"])
             #img_1d = np.fromstring(model_prediction["original_img"], dtype=np.uint8)
-            #image = img_1d.reshape((224, 224, -1))
+            #image = img_1d.reshape((224, 224, 3))
             data_id = model_prediction["data_id"].decode('utf-8')
             object_index = model_prediction["object_index"]
             ground_truth_output = model_prediction["output_vector"]
@@ -95,13 +101,18 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
             
             if generate_imgs:
                 fig = plt.figure(figsize=(15,15))
-                ax = plt.subplot(1, 3, 1)
-                ax2 = plt.subplot(1, 3, 2)
-                ax3 = plt.subplot(1, 3, 3)
+                ax = plt.subplot(1, 2, 1)
+                ax.set_xticks([])
+                ax.set_yticks([])
+                
+                ax2 = plt.subplot(1, 2, 2)
+                ax2.set_xticks([])
+                ax2.set_yticks([])
+                #ax3 = plt.subplot(1, 3, 3)
                 
                 ax.imshow(image)
                 ax2.imshow(image)
-                ax3.imshow(image)
+                #ax3.imshow(image)
 
                 virtual_control_points_pred = np.array(model_output[:16]).reshape(8,2)*224
                 reprojected_virtual_control_points = reprojected_virtual_control_points*224
@@ -109,7 +120,7 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
 
                 line_boxes(ax, virtual_control_points, 'r')
                 line_boxes(ax2, virtual_control_points_pred, 'b')
-                line_boxes(ax3, reprojected_virtual_control_points, 'g')
+                #line_boxes(ax3, reprojected_virtual_control_points, 'g')
                 plt.tight_layout()
 
                 plt.savefig("./{}_eval.jpg".format(counter))
@@ -120,13 +131,14 @@ def get_viewpoint_errors(model_dir, model_fn, tfrecords_file, generate_imgs):
             
             print("Difference in Degrees")
             print(math.degrees(difference))
-
+            f.write("%d\r\n" % (math.degrees(difference)))
+            
             #If difference is in radians otherwise 30 degrees
             if difference < math.pi/6:
                 print("Within Limit")
                 print("Difference in Degrees")
                 print(math.degrees(difference))
-                
+                #f.write("%d\r\n" % (math.degrees(difference)))
                 records_within_limit_radians +=1
 
             if counter % 500 == 0:
@@ -164,12 +176,12 @@ def get_single_examples_from_batch(all_model_predictions):
     for output_batch in all_model_predictions:
         data_ids = output_batch['data_id']
         object_classes = output_batch['object_class']
-        cad_indices = output_batch['cad_index']
+        #cad_indices = output_batch['cad_index']
         object_indices = output_batch['object_index']
         output_vectors = output_batch['output_vector']
-        image_descriptors = output_batch['image_descriptor']
+        #image_descriptors = output_batch['image_descriptor']
         predictions_2d = output_batch['2d_prediction']
-        # images = output_batch['img']
+        images = output_batch['img']
         original_images = output_batch['original_img']
         number_in_batch = min(len(data_ids), len(object_indices), len(output_vectors), len(predictions_2d), len(original_images))
         
@@ -177,11 +189,11 @@ def get_single_examples_from_batch(all_model_predictions):
             single_examples.append({
                 "data_id": data_ids[0],
                 "object_index": object_indices[0],
-                "cad_index": cad_indices[0],
+                #"cad_index": cad_indices[0],
                 "output_vector": output_vectors[0],
-                "image_descriptor": image_descriptors[0],
+                #"image_descriptor": image_descriptors[0],
                 "object_class": object_classes[0],
-                # "img": images[0],
+                "img": images[0],
                 "original_img": original_images[0], 
                 "2d_prediction": predictions_2d     
             })
@@ -192,9 +204,9 @@ def get_single_examples_from_batch(all_model_predictions):
                     "object_index": object_indices[index],
                     "output_vector": output_vectors[index],
                     "object_class": object_classes[index],
-                    "image_descriptor": image_descriptors[index],
-                    # "img": images[index],
-                    "cad_index": cad_indices[index],
+                    #"image_descriptor": image_descriptors[index],
+                    "img": images[index],
+                    #"cad_index": cad_indices[index],
                     "original_img": original_images[index], 
                     "2d_prediction": predictions_2d[index]     
                 })

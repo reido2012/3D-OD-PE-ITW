@@ -65,12 +65,12 @@ def start_eval(model_path, visualize=True):
 
     for counter, model_prediction in enumerate(all_model_predictions):
         # print("*"*40)
-        if counter < 200:
+        if counter < 130:
             continue
 
         visualize = True
 
-        if counter == 210:
+        if counter == 140:
             break
 
         # model_output = model_prediction["2d_prediction"]
@@ -148,7 +148,7 @@ def rot_to_interval(ground_truth_rotation_matrix, interval=30):
     # print(f"Rot Z: {rot_z}")
 
     rot_x = get_closest_interval(rot_x, interval, check_non_negative=False)
-    rot_x = rot_x + 90
+    rot_x = rot_x #+ 90
     rot_y = get_closest_interval(rot_y, interval)
     rot_z = get_closest_interval(rot_z, interval)
 
